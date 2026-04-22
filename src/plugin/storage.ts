@@ -90,11 +90,12 @@ export async function ensureGitignore(configDir: string): Promise<void> {
         added: missingEntries,
       });
     }
-  } catch {
-    // Non-critical feature
+  } catch (error) {
+    log.warn("Failed to update .gitignore with account storage entries", {
+      error: String(error),
+    });
   }
 }
-
 /**
  * Synchronous version of ensureGitignore for use in sync code paths.
  */
@@ -134,11 +135,12 @@ export function ensureGitignoreSync(configDir: string): void {
         added: missingEntries,
       });
     }
-  } catch {
-    // Non-critical feature
+  } catch (error) {
+    log.warn("Failed to update .gitignore with account storage entries", {
+      error: String(error),
+    });
   }
 }
-
 export type ModelFamily = "claude" | "gemini";
 export type { HeaderStyle };
 
@@ -787,10 +789,13 @@ async function loadAccountsUnsafe(): Promise<AccountStorageV4 | null> {
     if (code === "ENOENT") {
       return null;
     }
+    log.error("Failed to load account storage (file exists but unreadable)", {
+      error: String(error),
+      code: code ?? "unknown",
+    });
     return null;
   }
 }
-
 export async function clearAccounts(): Promise<void> {
   try {
     const path = getStoragePath();

@@ -49,12 +49,13 @@ export function transformStreamingPayload(
             : parsed.response;
           return `data: ${JSON.stringify(transformed)}`;
         }
-      } catch (_) {}
+    } catch (_) {
+        console.warn("[antigravity] Malformed SSE chunk, passing through untransformed:", json.slice(0, 200));
+      }
       return line;
     })
     .join('\n');
 }
-
 export function deduplicateThinkingText(
   response: unknown,
   sentBuffer: ThoughtBuffer,
@@ -222,10 +223,11 @@ export function transformSseLine(
         : response;
       return `data: ${JSON.stringify(transformed)}`;
     }
-  } catch (_) {}
+  } catch (_) {
+    console.warn("[antigravity] Malformed SSE chunk in streaming transform, passing through untransformed:", json.slice(0, 200));
+  }
   return line;
 }
-
 export function cacheThinkingSignaturesFromResponse(
   response: unknown,
   signatureSessionKey: string,

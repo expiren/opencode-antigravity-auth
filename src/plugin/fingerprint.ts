@@ -71,9 +71,9 @@ export interface FingerprintHeaders {
 }
 
 function randomFrom<T>(arr: readonly T[]): T {
-  return arr[Math.floor(Math.random() * arr.length)]!;
+  const index = crypto.getRandomValues(new Uint32Array(1))[0]! % arr.length;
+  return arr[index]!;
 }
-
 function generateDeviceId(): string {
   return crypto.randomUUID();
 }

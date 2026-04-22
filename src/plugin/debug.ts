@@ -294,15 +294,15 @@ function maskHeaders(headers?: HeadersInit | Headers): Record<string, string> {
   }
 
   const result: Record<string, string> = {};
+  const SENSITIVE_HEADERS = new Set(["authorization", "x-api-key", "x-goog-api-key", "cookie", "set-cookie"]);
   const parsed = headers instanceof Headers ? headers : new Headers(headers);
   parsed.forEach((value, key) => {
-    if (key.toLowerCase() === "authorization") {
+    if (SENSITIVE_HEADERS.has(key.toLowerCase())) {
       result[key] = "[redacted]";
     } else {
       result[key] = value;
     }
-  });
-  return result;
+  });  return result;
 }
 
 /**

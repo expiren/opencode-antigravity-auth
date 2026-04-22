@@ -311,7 +311,7 @@ export class AccountManager {
 
   private savePending = false;
   private saveTimeout: ReturnType<typeof setTimeout> | null = null;
-  private savePromiseResolvers: Array<() => void> = [];
+  private savePromiseResolvers: Array<{ resolve: () => void; reject: (err: unknown) => void }> = [];
 
   static async loadFromDisk(authFallback?: OAuthAuthDetails): Promise<AccountManager> {
     const stored = await loadAccounts();
@@ -1036,28 +1036,29 @@ export class AccountManager {
     if (!this.savePending) {
       return;
     }
-    return new Promise<void>((resolve) => {
-      this.savePromiseResolvers.push(resolve);
+    return new Promise<void>((resolve, reject) => {
+      this.savePromiseResolvers.push({ resolve, reject });
     });
   }
-
   private async executeSave(): Promise<void> {
     this.savePending = false;
     this.saveTimeout = null;
     
+    const resolvers = this.savePromiseResolvers;
+    this.savePromiseResolvers = [];
+
     try {
       await this.saveToDisk();
-    } catch {
-      // best-effort persistence; avoid unhandled rejection from timer-driven saves
-    } finally {
-      const resolvers = this.savePromiseResolvers;
-      this.savePromiseResolvers = [];
-      for (const resolve of resolvers) {
+      for (const { resolve } of resolvers) {
         resolve();
+      }
+    } catch (error) {
+      console.warn("[antigravity] Failed to persist account state to disk:", String(error));
+      for (const { reject } of resolvers) {
+        reject(error);
       }
     }
   }
-
   // ========== Fingerprint Management ==========
 
   /**
