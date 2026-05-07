@@ -21,6 +21,11 @@ describe("isOAuthAuth", () => {
     };
     expect(isOAuthAuth(auth)).toBe(false);
   });
+
+  it("returns false for missing auth", () => {
+    expect(isOAuthAuth(undefined)).toBe(false);
+    expect(isOAuthAuth(null)).toBe(false);
+  });
 });
 
 describe("parseRefreshParts", () => {
