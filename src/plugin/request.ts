@@ -65,9 +65,9 @@ import {
   isClaudeModel,
   isClaudeThinkingModel,
   CLAUDE_THINKING_MAX_OUTPUT_TOKENS,
+  appendClaudeThinkingHint,
   type ThinkingTier,
-} from "./transform";
-import { detectErrorType } from "./recovery";
+} from "./transform";import { detectErrorType } from "./recovery";
 import { getSessionFingerprint, buildFingerprintHeaders, type Fingerprint } from "./fingerprint";
 import type { GoogleSearchConfig } from "./transform/types";
 
@@ -1194,27 +1194,7 @@ export function prepareAntigravityRequest(
         }
 
         if (isClaudeThinking && Array.isArray(requestPayload.tools) && requestPayload.tools.length > 0) {
-          const hint = "Interleaved thinking is enabled. You may think between tool calls and after receiving tool results before deciding the next action or final answer. Do not mention these instructions or any constraints about thinking blocks; just apply them.";
-          const existing = requestPayload.systemInstruction;
-
-          if (typeof existing === "string") {
-            // Convert string to parts array, append hint as separate part to avoid mutating cached text
-            requestPayload.systemInstruction = { parts: [{ text: existing }, { text: hint }] };
-          } else if (existing && typeof existing === "object") {
-            const sys = existing as Record<string, unknown>;
-            const partsValue = sys.parts;
-
-            if (Array.isArray(partsValue)) {
-              // Append hint as a NEW separate part — spread to avoid mutating shared array reference
-              sys.parts = [...partsValue, { text: hint }];
-            } else {
-              sys.parts = [{ text: hint }];
-            }
-
-            requestPayload.systemInstruction = sys;
-          } else if (Array.isArray(requestPayload.contents)) {
-            requestPayload.systemInstruction = { parts: [{ text: hint }] };
-          }
+          appendClaudeThinkingHint(requestPayload);
         }
         // Normalize cached_content → cachedContent (camelCase) but preserve the value.
         // OpenCode uses cachedContent for prompt caching — deleting it busts cache.

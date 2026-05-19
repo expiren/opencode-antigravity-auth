@@ -100,32 +100,16 @@ export function appendClaudeThinkingHint(
   const existing = payload.systemInstruction;
 
   if (typeof existing === "string") {
-    payload.systemInstruction = existing.trim().length > 0 ? `${existing}\n\n${hint}` : hint;
+    payload.systemInstruction = existing.trim().length > 0
+      ? { role: "user", parts: [{ text: existing }, { text: hint }] }
+      : hint;
   } else if (existing && typeof existing === "object") {
     const sys = existing as Record<string, unknown>;
     const partsValue = sys.parts;
 
     if (Array.isArray(partsValue)) {
-      const parts = partsValue as unknown[];
-      let appended = false;
-
-      // Find the last text part and append to it
-      for (let i = parts.length - 1; i >= 0; i--) {
-        const part = parts[i];
-        if (part && typeof part === "object") {
-          const partRecord = part as Record<string, unknown>;
-          const text = partRecord.text;
-          if (typeof text === "string") {
-            partRecord.text = `${text}\n\n${hint}`;
-            appended = true;
-            break;
-          }
-        }
-      }
-
-      if (!appended) {
-        parts.push({ text: hint });
-      }
+      // Spread to avoid mutating shared array reference (OpenCode may reuse between requests)
+      sys.parts = [...partsValue, { text: hint }];
     } else {
       sys.parts = [{ text: hint }];
     }

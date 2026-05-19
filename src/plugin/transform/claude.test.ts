@@ -239,15 +239,19 @@ describe("ensureClaudeMaxOutputTokens", () => {
 
 describe("appendClaudeThinkingHint", () => {
   describe("with string systemInstruction", () => {
-    it("appends hint to existing string instruction", () => {
+    it("preserves existing string instruction and appends hint as separate part", () => {
       const payload: RequestPayload = {
         systemInstruction: "You are a helpful assistant.",
       };
       appendClaudeThinkingHint(payload);
       
-      expect(payload.systemInstruction).toBe(
-        `You are a helpful assistant.\n\n${CLAUDE_INTERLEAVED_THINKING_HINT}`
-      );
+      expect(payload.systemInstruction).toEqual({
+        role: "user",
+        parts: [
+          { text: "You are a helpful assistant." },
+          { text: CLAUDE_INTERLEAVED_THINKING_HINT },
+        ],
+      });
     });
 
     it("uses hint alone when existing instruction is empty", () => {
@@ -274,12 +278,15 @@ describe("appendClaudeThinkingHint", () => {
       };
       appendClaudeThinkingHint(payload, "Custom hint.");
       
-      expect(payload.systemInstruction).toBe("Base instruction.\n\nCustom hint.");
+      expect(payload.systemInstruction).toEqual({
+        role: "user",
+        parts: [{ text: "Base instruction." }, { text: "Custom hint." }],
+      });
     });
   });
 
   describe("with object systemInstruction (parts array)", () => {
-    it("appends hint to last text part", () => {
+    it("preserves existing text parts and appends hint as separate part", () => {
       const payload: RequestPayload = {
         systemInstruction: {
           parts: [{ text: "First part." }, { text: "Last part." }],
@@ -289,10 +296,11 @@ describe("appendClaudeThinkingHint", () => {
       
       const sys = payload.systemInstruction as any;
       expect(sys.parts[0].text).toBe("First part.");
-      expect(sys.parts[1].text).toBe(`Last part.\n\n${CLAUDE_INTERLEAVED_THINKING_HINT}`);
+      expect(sys.parts[1].text).toBe("Last part.");
+      expect(sys.parts[2].text).toBe(CLAUDE_INTERLEAVED_THINKING_HINT);
     });
 
-    it("appends hint to single text part", () => {
+    it("preserves single text part and appends hint as separate part", () => {
       const payload: RequestPayload = {
         systemInstruction: {
           parts: [{ text: "Only part." }],
@@ -301,7 +309,8 @@ describe("appendClaudeThinkingHint", () => {
       appendClaudeThinkingHint(payload);
       
       const sys = payload.systemInstruction as any;
-      expect(sys.parts[0].text).toBe(`Only part.\n\n${CLAUDE_INTERLEAVED_THINKING_HINT}`);
+      expect(sys.parts[0].text).toBe("Only part.");
+      expect(sys.parts[1].text).toBe(CLAUDE_INTERLEAVED_THINKING_HINT);
     });
 
     it("creates new text part when no text parts exist", () => {
@@ -727,7 +736,8 @@ describe("applyClaudeTransforms", () => {
       cleanJSONSchema: mockCleanJSONSchema,
     });
     
-    expect((payload.systemInstruction as string)).toContain(CLAUDE_INTERLEAVED_THINKING_HINT);
+    const sys = payload.systemInstruction as { parts: Array<{ text?: string }> };
+    expect(sys.parts.map(part => part.text)).toContain(CLAUDE_INTERLEAVED_THINKING_HINT);
   });
 
   it("does not append thinking hint for thinking models without tools", () => {
