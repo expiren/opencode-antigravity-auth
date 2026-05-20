@@ -131,6 +131,15 @@ export const OPENCODE_MODEL_DEFINITIONS: OpencodeModelDefinitions = {
       max: { thinkingConfig: { thinkingBudget: 32768 } },
     },
   }),
+  "antigravity-gemini-3.1-flash-image": defineModel("antigravity-gemini-3.1-flash-image", {
+    name: "Gemini 3.1 Flash Image (Antigravity)",
+    reasoning: false,
+    limit: { context: 66000, output: 33000 },
+    modalities: {
+      input: ["text", "image"],
+      output: ["text", "image"],
+    },
+  }),
   "antigravity-gpt-oss-120b": defineModel("antigravity-gpt-oss-120b", {
     name: "GPT-OSS 120B (Antigravity)",
     reasoning: false,
@@ -175,6 +184,15 @@ export const OPENCODE_MODEL_DEFINITIONS: OpencodeModelDefinitions = {
     reasoning: true,
     limit: { context: 1048576, output: 65536 },
     modalities: DEFAULT_MODALITIES,
+  }),
+  "gemini-3.1-flash-image-preview": defineModel("gemini-3.1-flash-image-preview", {
+    name: "Gemini 3.1 Flash Image Preview (Gemini CLI)",
+    reasoning: false,
+    limit: { context: 66000, output: 33000 },
+    modalities: {
+      input: ["text", "image"],
+      output: ["text", "image"],
+    },
   }),
   "gemini-3.1-pro-preview-customtools": defineModel("gemini-3.1-pro-preview-customtools", {
     name: "Gemini 3.1 Pro Preview Custom Tools (Gemini CLI)",
