@@ -33,17 +33,14 @@ export const GEMINI_3_THINKING_LEVELS = ["minimal", "low", "medium", "high"] as 
  * Model aliases - maps user-friendly names to API model names.
  * 
  * Format:
- * - Gemini 3 Pro variants: gemini-3-pro-{low,medium,high}
+ * - Gemini 3.x Pro variants: gemini-3.1-pro-{low,high}
  * - Claude thinking variants: claude-{model}-thinking-{low,medium,high}
  * - Claude non-thinking: claude-{model} (no -thinking suffix)
  */
 export const MODEL_ALIASES: Record<string, string> = {
-  // Gemini 3 variants - for Gemini CLI only (tier stripped, thinkingLevel used)
+  // Gemini 3.x variants - for Gemini CLI only (tier stripped, thinkingLevel used)
   // For Antigravity, these are bypassed and full model name is kept
-  "gemini-3-pro-low": "gemini-3-pro",
-  "gemini-3-pro-high": "gemini-3-pro",
-  "gemini-3.1-pro-low": "gemini-3.1-pro",
-  "gemini-3.1-pro-high": "gemini-3.1-pro",
+  "gemini-3.1-pro-low": "gemini-3.1-pro",  "gemini-3.1-pro-high": "gemini-3.1-pro",
   "gemini-3-flash-low": "gemini-3-flash",
   "gemini-3-flash-medium": "gemini-3-flash",
   "gemini-3-flash-high": "gemini-3-flash",
@@ -164,9 +161,7 @@ function resolveGemini35FlashAntigravityModel(tier?: ThinkingTier): string {
  *
  * Examples:
  * - "gemini-2.5-flash" → { quotaPreference: "antigravity" }
- * - "gemini-3-pro-preview" → { quotaPreference: "antigravity" }
- * - "antigravity-gemini-3-pro-high" → { quotaPreference: "antigravity", explicitQuota: true }
- * - "claude-opus-4-6-thinking-medium" → { quotaPreference: "antigravity" }
+ * - "antigravity-gemini-3.1-pro-high" → { quotaPreference: "antigravity", explicitQuota: true } * - "claude-opus-4-6-thinking-medium" → { quotaPreference: "antigravity" }
  *
  * @param requestedModel - The model name from the request
  * @param options - Optional configuration including cli_first preference
@@ -331,9 +326,7 @@ function budgetToGemini3Level(budget: number): "low" | "medium" | "high" {
  * 
  * Issue #103: When quota fallback occurs, model names need to be transformed:
  * - gemini-3-flash-preview (gemini-cli) → gemini-3-flash (antigravity)
- * - gemini-3-pro-preview (gemini-cli) → gemini-3-pro-low (antigravity)
- * - gemini-3-flash (antigravity) → gemini-3-flash-preview (gemini-cli)
- */
+ * - gemini-3-flash (antigravity) → gemini-3-flash-preview (gemini-cli) */
 export function resolveModelForHeaderStyle(
   requestedModel: string,
   headerStyle: "antigravity" | "gemini-cli"
