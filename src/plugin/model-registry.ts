@@ -18,7 +18,7 @@ export interface ModelLimit {
 }
 
 export type ModelModality = "text" | "image" | "pdf"
-export type ModelQuotaGroup = "claude" | "gemini-pro" | "gemini-flash"
+export type ModelQuotaGroup = "claude" | "gemini-pro" | "gemini-flash" | "gpt-oss"
 
 export interface ModelModalities {
   input: ModelModality[]
@@ -228,6 +228,9 @@ const QUOTA_GROUP_BY_MODEL_ID: Record<string, ModelQuotaGroup> = {
   "gemini-3-flash": "gemini-flash",
   "gemini-3-flash-agent": "gemini-flash",
   "gemini-3.5-flash-low": "gemini-flash",
+  "gemini-3.1-flash-image": "gemini-flash",
+  "gpt-oss-120b": "gpt-oss",
+  "gpt-oss-120b-medium": "gpt-oss",
 }
 
 export const OPENCODE_MODEL_DEFINITIONS = PUBLIC_MODEL_DEFINITIONS

@@ -14,7 +14,7 @@ import type { AccountMetadataV3 } from "./storage";
 
 const FETCH_TIMEOUT_MS = 10000;
 
-export type QuotaGroup = "claude" | "gemini-pro" | "gemini-flash";
+export type QuotaGroup = "claude" | "gemini-pro" | "gemini-flash" | "gpt-oss";
 
 export interface QuotaGroupSummary {
   remainingFraction?: number;
@@ -265,13 +265,12 @@ function aggregateGeminiCliQuota(response: RetrieveUserQuotaResponse): GeminiCli
       continue;
     }
     
-    // Filter out models we don't care about for Gemini CLI quotas
-    // Only show gemini-3-* and gemini-2.5-pro models (the premium ones)
+    // Filter to relevant Gemini CLI quota models (premium tier)
     const modelId = bucket.modelId;
-    const isRelevantModel = 
-      modelId.startsWith("gemini-3-") || 
-      modelId === "gemini-2.5-pro";
-    
+    const isRelevantModel =
+      modelId.startsWith("gemini-3-") ||
+      modelId.startsWith("gemini-3.") ||
+      modelId.startsWith("gemini-2.5-");    
     if (!isRelevantModel) {
       continue;
     }

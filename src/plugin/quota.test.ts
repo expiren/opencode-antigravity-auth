@@ -10,7 +10,12 @@ describe("classifyQuotaGroup", () => {
     expect(classifyQuotaGroup("claude-sonnet-4-6", "Claude Sonnet 4.6")).toBe("claude")
   })
 
+  it("classifies gpt-oss models into gpt-oss quota group", () => {
+    expect(classifyQuotaGroup("gpt-oss-120b", "GPT-OSS 120B")).toBe("gpt-oss")
+    expect(classifyQuotaGroup("gpt-oss-120b-medium", "GPT-OSS 120B")).toBe("gpt-oss")
+  })
+
   it("ignores unsupported non-quota models", () => {
-    expect(classifyQuotaGroup("gpt-oss-120b-medium", "GPT-OSS 120B")).toBeNull()
+    expect(classifyQuotaGroup("some-unknown-model", "Unknown Model")).toBeNull()
   })
 })

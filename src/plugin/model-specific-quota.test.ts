@@ -17,16 +17,16 @@ describe("Model-specific Gemini quota", () => {
 
   it("blocks only the specific Gemini model when markRateLimited is called with a model", () => {
     const account = manager.getCurrentAccountForFamily("gemini")!;
-    const modelPro = "gemini-1.5-pro";
-    const modelFlash = "gemini-1.5-flash";
+    const modelPro = "gemini-3.1-pro";
+    const modelFlash = "gemini-3-flash-agent";
 
-    // Mark gemini-1.5-pro as rate limited on antigravity
+    // Mark gemini-3.1-pro as rate limited on antigravity
     manager.markRateLimited(account, 60000, "gemini", "antigravity", modelPro);
 
-    // gemini-1.5-pro should be rate limited for antigravity
+    // gemini-3.1-pro should be rate limited for antigravity
     expect(manager.isRateLimitedForHeaderStyle(account, "gemini", "antigravity", modelPro)).toBe(true);
 
-    // gemini-1.5-flash should NOT be rate limited for antigravity
+    // gemini-3-flash-agent should NOT be rate limited for antigravity
     expect(manager.isRateLimitedForHeaderStyle(account, "gemini", "antigravity", modelFlash)).toBe(false);
 
     // General gemini (no model) should NOT be rate limited
@@ -35,10 +35,10 @@ describe("Model-specific Gemini quota", () => {
 
   it("falls back to gemini-cli only for the specific model", () => {
     const account = manager.getCurrentAccountForFamily("gemini")!;
-    const modelPro = "gemini-1.5-pro";
-    const modelFlash = "gemini-1.5-flash";
+    const modelPro = "gemini-3.1-pro";
+    const modelFlash = "gemini-3-flash-agent";
 
-    // Mark gemini-1.5-pro as rate limited on antigravity
+    // Mark gemini-3.1-pro as rate limited on antigravity
     manager.markRateLimited(account, 60000, "gemini", "antigravity", modelPro);
 
     // Available header style for Pro should be gemini-cli
@@ -52,8 +52,8 @@ describe("Model-specific Gemini quota", () => {
     const manager2 = new AccountManager(auth);
     
     const account = manager2.getCurrentAccountForFamily("gemini")!;
-    const modelPro = "gemini-1.5-pro";
-    const modelFlash = "gemini-1.5-flash";
+    const modelPro = "gemini-3.1-pro";
+    const modelFlash = "gemini-3-flash-agent";
 
     manager2.markRateLimited(account, 60000, "gemini", "antigravity", modelPro);
     manager2.markRateLimited(account, 60000, "gemini", "gemini-cli", modelPro);
@@ -68,13 +68,13 @@ describe("Model-specific Gemini quota", () => {
 
   it("base family rate limit blocks all models in that family", () => {
     const account = manager.getCurrentAccountForFamily("gemini")!;
-    const modelPro = "gemini-1.5-pro";
+    const modelPro = "gemini-3.1-pro";
 
     // Mark base gemini-antigravity as rate limited
     manager.markRateLimited(account, 60000, "gemini", "antigravity");
 
     // All Gemini models should now be blocked for antigravity on this account
     expect(manager.isRateLimitedForHeaderStyle(account, "gemini", "antigravity", modelPro)).toBe(true);
-    expect(manager.isRateLimitedForHeaderStyle(account, "gemini", "antigravity", "gemini-1.5-flash")).toBe(true);
+    expect(manager.isRateLimitedForHeaderStyle(account, "gemini", "antigravity", "gemini-3-flash-agent")).toBe(true);
   });
 });
