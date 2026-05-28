@@ -137,6 +137,7 @@ function buildModelBreakdown(accounts: AccountInfo[]): string[] {
   const results: string[] = []
 
   for (const { key, label } of QUOTA_KEYS) {
+    let availableCount = 0
     let exhaustedCount = 0
     let maxResetMs: number | undefined
 
@@ -150,14 +151,21 @@ function buildModelBreakdown(accounts: AccountInfo[]): string[] {
         if (resetMs !== null && (maxResetMs === undefined || resetMs > maxResetMs)) {
           maxResetMs = resetMs
         }
+      } else {
+        availableCount++
       }
     }
 
-    if (exhaustedCount > 0) {
-      const resetSuffix = maxResetMs !== undefined
-        ? ` ~${formatWaitDuration(maxResetMs)}`
-        : ''
-      results.push(`${label}: ${exhaustedCount} exhausted${resetSuffix}`)
+    if (exhaustedCount > 0 || availableCount > 0) {
+      const parts: string[] = []
+      if (availableCount > 0) parts.push(`${availableCount} available`)
+      if (exhaustedCount > 0) {
+        const resetSuffix = maxResetMs !== undefined
+          ? ` ~${formatWaitDuration(maxResetMs)}`
+          : ''
+        parts.push(`${exhaustedCount} exhausted${resetSuffix}`)
+      }
+      results.push(`${label}: ${parts.join(', ')}`)
     }
   }
 
