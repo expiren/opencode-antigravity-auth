@@ -1,5 +1,5 @@
 import {
-  ANTIGRAVITY_ENDPOINT_PROD,
+  ANTIGRAVITY_ENDPOINT_FALLBACKS,
   getAntigravityHeaders,
   ANTIGRAVITY_PROVIDER_ID,
   buildGeminiCliUserAgent,
@@ -22,12 +22,20 @@ export interface QuotaGroupSummary {
   modelCount: number;
 }
 
+export interface PerModelQuotaEntry {
+  modelId: string;
+  displayName?: string;
+  group: QuotaGroup | null;
+  remainingFraction: number;
+  resetTime?: string;
+}
+
 export interface QuotaSummary {
   groups: Partial<Record<QuotaGroup, QuotaGroupSummary>>;
+  perModel?: PerModelQuotaEntry[];
   modelCount: number;
   error?: string;
 }
-
 // Gemini CLI quota types
 export interface GeminiCliQuotaModel {
   modelId: string;
@@ -128,16 +136,14 @@ export function classifyQuotaGroup(modelName: string, displayName?: string): Quo
 
 function aggregateQuota(models?: Record<string, FetchAvailableModelEntry>): QuotaSummary {
   const groups: Partial<Record<QuotaGroup, QuotaGroupSummary>> = {};
+  const perModel: PerModelQuotaEntry[] = [];
   if (!models) {
-    return { groups, modelCount: 0 };
+    return { groups, perModel, modelCount: 0 };
   }
 
   let totalCount = 0;
   for (const [modelName, entry] of Object.entries(models)) {
     const group = classifyQuotaGroup(modelName, entry.displayName ?? entry.modelName);
-    if (!group) {
-      continue;
-    }
     const quotaInfo = entry.quotaInfo;
     const remainingFraction = quotaInfo
       ? normalizeRemainingFraction(quotaInfo.remainingFraction)
@@ -146,6 +152,19 @@ function aggregateQuota(models?: Record<string, FetchAvailableModelEntry>): Quot
     const resetTimestamp = parseResetTime(resetTime);
 
     totalCount += 1;
+
+    // Always preserve per-model data regardless of group classification
+    perModel.push({
+      modelId: modelName,
+      displayName: entry.displayName ?? entry.modelName,
+      group,
+      remainingFraction: remainingFraction ?? 0,
+      resetTime,
+    });
+
+    if (!group) {
+      continue;
+    }
 
     const existing = groups[group];
     const nextCount = (existing?.modelCount ?? 0) + 1;
@@ -175,7 +194,10 @@ function aggregateQuota(models?: Record<string, FetchAvailableModelEntry>): Quot
     };
   }
 
-  return { groups, modelCount: totalCount };
+  // Sort per-model entries by model ID for consistent display
+  perModel.sort((a, b) => a.modelId.localeCompare(b.modelId));
+
+  return { groups, perModel, modelCount: totalCount };
 }
 
 async function fetchWithTimeout(url: string, options: RequestInit, timeoutMs = FETCH_TIMEOUT_MS): Promise<Response> {
@@ -192,30 +214,67 @@ async function fetchAvailableModels(
   accessToken: string,
   projectId: string,
 ): Promise<FetchAvailableModelsResponse> {
-  const endpoint = ANTIGRAVITY_ENDPOINT_PROD;
   const quotaUserAgent = getAntigravityHeaders()["User-Agent"] || "antigravity/windows/amd64";
   const errors: string[] = [];
 
-  const body = projectId ? { project: projectId } : {};
-  const response = await fetchWithTimeout(`${endpoint}/v1internal:fetchAvailableModels`, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
-      "Content-Type": "application/json",
-      "User-Agent": quotaUserAgent,
-    },
-    body: JSON.stringify(body),
-  });
+  for (const endpoint of ANTIGRAVITY_ENDPOINT_FALLBACKS) {
+    const body = projectId ? { project: projectId } : {};
+    try {
+      const response = await fetchWithTimeout(`${endpoint}/v1internal:fetchAvailableModels`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          "Content-Type": "application/json",
+          "User-Agent": quotaUserAgent,
+        },
+        body: JSON.stringify(body),
+      });
 
-  if (response.ok) {
-    return (await response.json()) as FetchAvailableModelsResponse;
+      if (response.ok) {
+        return (await response.json()) as FetchAvailableModelsResponse;
+      }
+
+      const status = response.status;
+
+      // 403: retry once without project (like AntigravityManager)
+      if (status === 403 && projectId) {
+        try {
+          const retryResponse = await fetchWithTimeout(`${endpoint}/v1internal:fetchAvailableModels`, {
+            method: "POST",
+            headers: {
+              Authorization: `Bearer ${accessToken}`,
+              "Content-Type": "application/json",
+              "User-Agent": quotaUserAgent,
+            },
+            body: JSON.stringify({}),
+          });
+          if (retryResponse.ok) {
+            return (await retryResponse.json()) as FetchAvailableModelsResponse;
+          }
+        } catch {
+          // Fall through to next endpoint
+        }
+      }
+
+      // 429/5xx: fall through to next endpoint
+      if (status === 429 || status >= 500) {
+        const message = await response.text().catch(() => "");
+        const snippet = message.trim().slice(0, 200);
+        errors.push(`fetchAvailableModels ${status} at ${endpoint}${snippet ? `: ${snippet}` : ""}`);
+        continue;
+      }
+
+      // Other errors (4xx): don't retry on different endpoint
+      const message = await response.text().catch(() => "");
+      const snippet = message.trim().slice(0, 200);
+      errors.push(`fetchAvailableModels ${status} at ${endpoint}${snippet ? `: ${snippet}` : ""}`);
+      break;
+    } catch (error) {
+      // Network error or timeout: fall through to next endpoint
+      errors.push(`fetchAvailableModels network error at ${endpoint}: ${error instanceof Error ? error.message : String(error)}`);
+      continue;
+    }
   }
-
-  const message = await response.text().catch(() => "");
-  const snippet = message.trim().slice(0, 200);
-  errors.push(
-    `fetchAvailableModels ${response.status} at ${endpoint}${snippet ? `: ${snippet}` : ""}`,
-  );
 
   throw new Error(errors.join("; ") || "fetchAvailableModels failed");
 }
@@ -224,33 +283,43 @@ async function fetchGeminiCliQuota(
   accessToken: string,
   projectId: string,
 ): Promise<RetrieveUserQuotaResponse> {
-  const endpoint = ANTIGRAVITY_ENDPOINT_PROD;
   // Use Gemini CLI user-agent to get CLI quota buckets (not Antigravity buckets)
   const geminiCliUserAgent = buildGeminiCliUserAgent();
-  const body = projectId ? { project: projectId } : {};
-  
-  try {
-    const response = await fetchWithTimeout(`${endpoint}/v1internal:retrieveUserQuota`, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-        "Content-Type": "application/json",
-        "User-Agent": geminiCliUserAgent,
-      },
-      body: JSON.stringify(body),
-    });
 
-    if (response.ok) {
-      const data = (await response.json()) as RetrieveUserQuotaResponse;
-      return data;
+  for (const endpoint of ANTIGRAVITY_ENDPOINT_FALLBACKS) {
+    const body = projectId ? { project: projectId } : {};
+    try {
+      const response = await fetchWithTimeout(`${endpoint}/v1internal:retrieveUserQuota`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          "Content-Type": "application/json",
+          "User-Agent": geminiCliUserAgent,
+        },
+        body: JSON.stringify(body),
+      });
+
+      if (response.ok) {
+        return (await response.json()) as RetrieveUserQuotaResponse;
+      }
+
+      const status = response.status;
+
+      // 429/5xx: fall through to next endpoint
+      if (status === 429 || status >= 500) {
+        continue;
+      }
+
+      // Other errors: don't retry on different endpoint
+      return { buckets: [] };
+    } catch {
+      // Network error or timeout: fall through to next endpoint
+      continue;
     }
-
-    // Non-OK response - return empty buckets
-    return { buckets: [] };
-  } catch {
-    // Network error or timeout - return empty buckets
-    return { buckets: [] };
   }
+
+  // All endpoints failed
+  return { buckets: [] };
 }
 
 function aggregateGeminiCliQuota(response: RetrieveUserQuotaResponse): GeminiCliQuotaSummary {

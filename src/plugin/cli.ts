@@ -47,6 +47,7 @@ export interface ExistingAccountInfo {
   cooldownMs?: number;
   cooldownReason?: CooldownReason;
   cachedQuota?: Partial<Record<string, QuotaGroupSummary>>;
+  cachedPerModelQuota?: { modelId: string; displayName?: string; group: string | null; remainingFraction: number; resetTime?: string }[];
   fingerprintHistory?: FingerprintVersion[];
 }
 
@@ -119,6 +120,7 @@ export async function promptLoginMode(existingAccounts: ExistingAccountInfo[]): 
     cooldownMs: acc.cooldownMs,
     cooldownReason: acc.cooldownReason,
     cachedQuota: acc.cachedQuota,
+    cachedPerModelQuota: acc.cachedPerModelQuota,
     fingerprintHistory: acc.fingerprintHistory,
   }));
   console.log("");

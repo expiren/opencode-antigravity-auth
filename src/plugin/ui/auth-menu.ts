@@ -25,6 +25,7 @@ export interface AccountInfo {
   cooldownMs?: number;
   cooldownReason?: CooldownReason;
   cachedQuota?: Partial<Record<string, QuotaGroupSummary>>;
+  cachedPerModelQuota?: { modelId: string; displayName?: string; group: string | null; remainingFraction: number; resetTime?: string }[];
   fingerprintHistory?: FingerprintVersion[];
 }
 
@@ -143,22 +144,52 @@ function buildModelBreakdown(accounts: AccountInfo[]): string[] {
 
     for (const acc of accounts) {
       if (acc.enabled === false) continue
-      const group = acc.cachedQuota?.[key]
-      if (!group || typeof group.remainingFraction !== 'number') continue
-      if (group.remainingFraction <= 0) {
-        // Skip stale exhaustion: if resetTime is missing or in the past,
-        // Google has likely already reset the quota — count as available
-        const resetMs = parseResetTimeToMs(group.resetTime)
-        if (resetMs !== null && resetMs > 0) {
-          exhaustedCount++
-          if (maxResetMs === undefined || resetMs > maxResetMs) {
-            maxResetMs = resetMs
+
+      // Prefer per-model data when available for more accurate counting
+      if (acc.cachedPerModelQuota && acc.cachedPerModelQuota.length > 0) {
+        const modelsInGroup = acc.cachedPerModelQuota.filter(m => m.group === key)
+        if (modelsInGroup.length === 0) continue
+        // Account is exhausted for this group if ALL models in the group are at 0%
+        const allExhausted = modelsInGroup.every(m => m.remainingFraction <= 0)
+        if (allExhausted) {
+          // Check staleness: skip if all reset times are in the past
+          const freshExhausted = modelsInGroup.some(m => {
+            const resetMs = parseResetTimeToMs(m.resetTime)
+            return resetMs !== null && resetMs > 0
+          })
+          if (freshExhausted) {
+            exhaustedCount++
+            for (const m of modelsInGroup) {
+              const resetMs = parseResetTimeToMs(m.resetTime)
+              if (resetMs !== null && resetMs > 0 && (maxResetMs === undefined || resetMs > maxResetMs)) {
+                maxResetMs = resetMs
+              }
+            }
+          } else {
+            availableCount++
           }
         } else {
           availableCount++
         }
       } else {
-        availableCount++
+        // Fall back to group-level cachedQuota
+        const group = acc.cachedQuota?.[key]
+        if (!group || typeof group.remainingFraction !== 'number') continue
+        if (group.remainingFraction <= 0) {
+          // Skip stale exhaustion: if resetTime is missing or in the past,
+          // Google has likely already reset the quota — count as available
+          const resetMs = parseResetTimeToMs(group.resetTime)
+          if (resetMs !== null && resetMs > 0) {
+            exhaustedCount++
+            if (maxResetMs === undefined || resetMs > maxResetMs) {
+              maxResetMs = resetMs
+            }
+          } else {
+            availableCount++
+          }
+        } else {
+          availableCount++
+        }
       }
     }
 

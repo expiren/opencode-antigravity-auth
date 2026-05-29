@@ -2641,6 +2641,7 @@ export const createAntigravityPlugin = (providerId: string) => async (
                     cooldownMs,
                     cooldownReason: cooldownMs ? acc.cooldownReason : undefined,
                     cachedQuota: acc.cachedQuota,
+                    cachedPerModelQuota: acc.cachedPerModelQuota,
                     fingerprintHistory: acc.fingerprintHistory,
                   };                });
                 
@@ -2764,6 +2765,7 @@ export const createAntigravityPlugin = (providerId: string) => async (
                       const acc = existingStorage.accounts[res.index];
                       if (acc) {
                         acc.cachedQuota = res.quota.groups;
+                        acc.cachedPerModelQuota = res.quota.perModel;
                         acc.cachedQuotaUpdatedAt = Date.now();
                         storageUpdated = true;
                       }
@@ -2773,11 +2775,11 @@ export const createAntigravityPlugin = (providerId: string) => async (
                       existingStorage.accounts[res.index] = {
                         ...res.updatedAccount,
                         cachedQuota: res.quota?.groups,
+                        cachedPerModelQuota: res.quota?.perModel,
                         cachedQuotaUpdatedAt: Date.now(),
                       };
                       storageUpdated = true;
-                    }
-                  }
+                    }                  }
                   if (storageUpdated) {
                     await saveAccounts(existingStorage);
                   }

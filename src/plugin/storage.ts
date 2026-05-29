@@ -213,11 +213,12 @@ export interface AccountMetadataV3 {
   verificationRequiredAt?: number;
   verificationRequiredReason?: string;
   verificationUrl?: string;
-  /** Cached soft quota data */
+  /** Cached soft quota data (group-level aggregation) */
   cachedQuota?: Record<string, { remainingFraction?: number; resetTime?: string; modelCount: number }>;
+  /** Cached per-model quota data (individual model granularity) */
+  cachedPerModelQuota?: { modelId: string; displayName?: string; group: string | null; remainingFraction: number; resetTime?: string }[];
   cachedQuotaUpdatedAt?: number;
 }
-
 export interface AccountStorageV3 {
   version: 3;
   accounts: AccountMetadataV3[];
