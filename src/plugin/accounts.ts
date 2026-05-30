@@ -318,6 +318,8 @@ export class AccountManager {
   private saveTimeout: ReturnType<typeof setTimeout> | null = null;
   private savePromiseResolvers: Array<{ resolve: () => void; reject: (err: unknown) => void }> = [];
 
+  private sessionStartTime: number = Date.now()
+  private sessionRequestCounts: Map<string, { claude: number, gemini: number }> = new Map()
   static async loadFromDisk(authFallback?: OAuthAuthDetails): Promise<AccountManager> {
     const stored = await loadAccounts();
     return new AccountManager(authFallback, stored);
@@ -1182,6 +1184,9 @@ export class AccountManager {
 
     account.dailyRequestCounts[family]++
     account.lastUsed = nowMs()
+
+    // Also track for session
+    this.recordSessionRequest(accountIndex, family)
   }
 
   /**
@@ -1230,6 +1235,59 @@ export class AccountManager {
 
     return result.sort((a, b) => b.count - a.count)
   }
+
+  /**
+   * Record a request for the current session (in-memory only).
+   */
+  recordSessionRequest(accountIndex: number, family: ModelFamily): void {
+    const key = String(accountIndex)
+    const current = this.sessionRequestCounts.get(key) ?? { claude: 0, gemini: 0 }
+    current[family]++
+    this.sessionRequestCounts.set(key, current)
+  }
+
+  /**
+   * Get a summary of the current session's request usage.
+   */
+  getSessionSummary(): {
+    durationMinutes: number
+    totalClaude: number
+    totalGemini: number
+    requestsPerHour: number
+    accountsUsed: number
+    perAccount: Array<{ index: number, email?: string, claude: number, gemini: number }>
+  } {
+    const durationMs = Date.now() - this.sessionStartTime
+    const durationMinutes = Math.round(durationMs / 60000)
+    const durationHours = durationMs / 3600000
+
+    let totalClaude = 0
+    let totalGemini = 0
+    const perAccount: Array<{ index: number, email?: string, claude: number, gemini: number }> = []
+
+    for (const [key, counts] of this.sessionRequestCounts) {
+      const idx = Number(key)
+      const account = this.accounts[idx]
+      totalClaude += counts.claude
+      totalGemini += counts.gemini
+      if (counts.claude > 0 || counts.gemini > 0) {
+        perAccount.push({ index: idx, email: account?.email, claude: counts.claude, gemini: counts.gemini })
+      }
+    }
+
+    const totalRequests = totalClaude + totalGemini
+    const requestsPerHour = durationHours > 0 ? Math.round(totalRequests / durationHours) : 0
+
+    return {
+      durationMinutes,
+      totalClaude,
+      totalGemini,
+      requestsPerHour,
+      accountsUsed: perAccount.length,
+      perAccount: perAccount.sort((a, b) => (b.claude + b.gemini) - (a.claude + a.gemini)),
+    }
+  }
+
   isAccountOverSoftQuota(account: ManagedAccount, family: ModelFamily, thresholdPercent: number, cacheTtlMs: number, model?: string | null): boolean {
     return isOverSoftQuotaThreshold(account, family, thresholdPercent, cacheTtlMs, model);
   }

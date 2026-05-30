@@ -1285,8 +1285,19 @@ export const createAntigravityPlugin = (providerId: string) => async (
     // Track if this is a child session (subagent, background task)
     // This is used to filter toasts based on toast_scope config
     if (input.event.type === "session.created") {
-      const props = input.event.properties as { info?: { parentID?: string } } | undefined;
-      if (props?.info?.parentID) {
+      // Log previous session's quota summary before resetting for new session
+      const prevSummary = activeAccountManager?.getSessionSummary()
+      if (prevSummary && (prevSummary.totalClaude > 0 || prevSummary.totalGemini > 0)) {
+        log.debug("prev-session-quota-summary", {
+          durationMinutes: prevSummary.durationMinutes,
+          totalClaude: prevSummary.totalClaude,
+          totalGemini: prevSummary.totalGemini,
+          requestsPerHour: prevSummary.requestsPerHour,
+          accountsUsed: prevSummary.accountsUsed,
+        })
+      }
+
+      const props = input.event.properties as { info?: { parentID?: string } } | undefined;      if (props?.info?.parentID) {
         isChildSession = true;
         childSessionParentID = props.info.parentID;
         log.debug("child-session-detected", { parentID: props.info.parentID });
@@ -2455,6 +2466,27 @@ export const createAntigravityPlugin = (providerId: string) => async (
                 }
                 const totalToday = accountManager.getTotalDailyRequests(family)
                 pushDebug(`[Quota] Total ${family} requests today (all accounts): ${totalToday}`)
+
+                // Post-request quota state: show cached remaining quota for this account
+                const cachedQuota = account.cachedQuota
+                if (cachedQuota) {
+                  const quotaFamily = family === "claude" ? "claude" : "gemini-flash"
+                  const groupQuota = cachedQuota[quotaFamily]
+                  if (groupQuota?.remainingFraction != null) {
+                    const pct = Math.round(groupQuota.remainingFraction * 100)
+                    pushDebug(`[Quota] Account ${account.index} cached ${quotaFamily} remaining: ${pct}%${groupQuota.resetTime ? ` (resets ${groupQuota.resetTime})` : ""}`)
+                  }
+                }
+
+                // Quota consumption rate estimation
+                const sessionSummary = accountManager.getSessionSummary()
+                if (sessionSummary.durationMinutes >= 1) {
+                  const familyTotal = family === "claude" ? sessionSummary.totalClaude : sessionSummary.totalGemini
+                  if (familyTotal > 0) {
+                    const ratePerHour = sessionSummary.requestsPerHour
+                    pushDebug(`[Quota] Session: ${sessionSummary.durationMinutes}min, ${familyTotal} ${family} reqs, ~${ratePerHour} reqs/hr, ${sessionSummary.accountsUsed} accounts used`)
+                  }
+                }
 
                 return transformedResponse;
               } catch (error) {
