@@ -35,9 +35,11 @@ describe("model registry", () => {
       "gemini-2.5-flash",
       "gemini-2.5-pro",
       "gemini-3-flash-preview",
+      "gemini-3.1-flash-image",
       "gemini-3.1-flash-image-preview",
       "gemini-3.1-pro-preview",
       "gemini-3.1-pro-preview-customtools",
+      "gemini-3.5-flash-preview",
     ])
 
     for (const definition of Object.values(definitions)) {

@@ -49,10 +49,7 @@ export interface Fingerprint {
   apiClient: string;
   clientMetadata: ClientMetadata;
   createdAt: number;
-  /** @deprecated Kept for backward compat with stored fingerprints */
-  quotaUser?: string;
 }
-
 /**
  * Fingerprint version for history tracking.
  * Stores a snapshot of a fingerprint with metadata about when/why it was saved.

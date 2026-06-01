@@ -2001,7 +2001,7 @@ export const createAntigravityPlugin = (providerId: string) => async (
             let headerStyle = preferredHeaderStyle;
             pushDebug(`headerStyle=${headerStyle} explicit=${explicitQuota}`);
             if (account.fingerprint) {
-              pushDebug(`fingerprint: quotaUser=${account.fingerprint.quotaUser} deviceId=${account.fingerprint.deviceId.slice(0, 8)}...`);
+              pushDebug(`fingerprint: deviceId=${account.fingerprint.deviceId.slice(0, 8)}...`);
             }
             
             // Check if this header style is rate-limited for this account
@@ -2756,6 +2756,15 @@ export const createAntigravityPlugin = (providerId: string) => async (
                     ? acc.coolingDownUntil - now
                     : undefined;
 
+                  // Age-gate quota data: ignore cached quota older than 60 minutes
+                  // to prevent stale exhaustion data from persisting in the UI.
+                  // AccountManager applies the same protection during account selection.
+                  const DISPLAY_QUOTA_MAX_AGE_MS = 60 * 60 * 1000;
+                  const quotaIsStale = acc.cachedQuotaUpdatedAt == null
+                    || (now - acc.cachedQuotaUpdatedAt) > DISPLAY_QUOTA_MAX_AGE_MS;
+                  const displayQuota = quotaIsStale ? undefined : acc.cachedQuota;
+                  const displayPerModelQuota = quotaIsStale ? undefined : acc.cachedPerModelQuota;
+
                   return {
                     email: acc.email,
                     index: idx,
@@ -2764,11 +2773,11 @@ export const createAntigravityPlugin = (providerId: string) => async (
                     status,
                     isCurrentAccount: idx === (existingStorage.activeIndex ?? 0),
                     enabled: acc.enabled !== false,
-                    quotaSummary: formatCachedQuotaSummary(acc),
+                    quotaSummary: quotaIsStale ? undefined : formatCachedQuotaSummary(acc),
                     cooldownMs,
                     cooldownReason: cooldownMs ? acc.cooldownReason : undefined,
-                    cachedQuota: acc.cachedQuota,
-                    cachedPerModelQuota: acc.cachedPerModelQuota,
+                    cachedQuota: displayQuota,
+                    cachedPerModelQuota: displayPerModelQuota,
                     fingerprintHistory: acc.fingerprintHistory,
                   };                });
                 
@@ -2826,7 +2835,7 @@ export const createAntigravityPlugin = (providerId: string) => async (
                         // If quota is 0% and reset time is in the past, the model is
                         // likely paywalled / permanently unavailable on this quota pool
                         return remainingFraction !== undefined && remainingFraction <= 0
-                          ? ' (unavailable)'
+                          ? ' (paid only)'
                           : ' (resetting...)';
                       }                      
                       const hours = ms / (1000 * 60 * 60);
