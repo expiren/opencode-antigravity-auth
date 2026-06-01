@@ -1954,23 +1954,19 @@ export const createAntigravityPlugin = (providerId: string) => async (
                   maxOutputTokens: 1,
                 };
 
-                const probeHeaders = new Headers(prepared.init.headers ?? {});
-                probeHeaders.set("accept", "application/json");
-
-                const probeUrl = toUrlString(prepared.request).replace(
-                  ":streamGenerateContent?alt=sse",
-                  ":generateContent",
-                );
-
                 pushDebug("cache-warmup-probe: start");
-                const probeResponse = await fetch(probeUrl, {
+                const probeResponse = await fetch(toUrlString(prepared.request), {
                   ...prepared.init,
                   method: "POST",
-                  headers: probeHeaders,
                   body: JSON.stringify(parsed),
                 });
 
-                await probeResponse.text();
+                if (probeResponse.body) {
+                  const reader = probeResponse.body.getReader();
+                  while (!(await reader.read()).done) { /* drain */ }
+                } else {
+                  await probeResponse.text();
+                }
                 const status = probeResponse.status;
                 pushDebug(`cache-warmup-probe: done status=${status}`);
               } catch (error) {
