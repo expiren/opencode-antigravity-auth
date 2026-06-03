@@ -1,0 +1,438 @@
+- generic [ref=e2]:
+  - generic:
+    - generic:
+      - tooltip "This user has previously committed to the magic-context repository."
+  - generic [ref=e3]:
+    - link "Skip to content" [ref=e4] [cursor=pointer]:
+      - /url: "#start-of-content"
+    - banner [ref=e6]:
+      - heading "Navigation Menu" [level=2] [ref=e7]
+      - generic [ref=e8]:
+        - link "Homepage" [ref=e10] [cursor=pointer]:
+          - /url: /
+          - img [ref=e11]
+        - generic [ref=e13]:
+          - navigation "Global" [ref=e16]:
+            - list [ref=e17]:
+              - listitem [ref=e18]:
+                - button "Platform" [ref=e20] [cursor=pointer]:
+                  - text: Platform
+                  - img [ref=e21]
+              - listitem [ref=e23]:
+                - button "Solutions" [ref=e25] [cursor=pointer]:
+                  - text: Solutions
+                  - img [ref=e26]
+              - listitem [ref=e28]:
+                - button "Resources" [ref=e30] [cursor=pointer]:
+                  - text: Resources
+                  - img [ref=e31]
+              - listitem [ref=e33]:
+                - button "Open Source" [ref=e35] [cursor=pointer]:
+                  - text: Open Source
+                  - img [ref=e36]
+              - listitem [ref=e38]:
+                - button "Enterprise" [ref=e40] [cursor=pointer]:
+                  - text: Enterprise
+                  - img [ref=e41]
+              - listitem [ref=e43]:
+                - link "Pricing" [ref=e44] [cursor=pointer]:
+                  - /url: https://github.com/pricing
+                  - generic [ref=e45]: Pricing
+          - generic [ref=e46]:
+            - button "Search or jump to…" [ref=e49] [cursor=pointer]:
+              - img [ref=e51]
+            - link "Sign in" [ref=e54] [cursor=pointer]:
+              - /url: /login?return_to=https%3A%2F%2Fgithub.com%2Fcortexkit%2Fmagic-context%2Fissues%2F125
+            - link "Sign up" [ref=e55] [cursor=pointer]:
+              - /url: /signup?ref_cta=Sign+up&ref_loc=header+logged+out&ref_page=%2F%3Cuser-name%3E%2F%3Crepo-name%3E%2Fvoltron%2Fissues_fragments%2Fissue_layout&source=header-repo&source_repo=cortexkit%2Fmagic-context
+            - button "Appearance settings" [ref=e58] [cursor=pointer]:
+              - img
+  - main [ref=e62]:
+    - generic [ref=e63]:
+      - generic [ref=e64]:
+        - generic [ref=e66]:
+          - img [ref=e67]
+          - link "cortexkit" [ref=e70] [cursor=pointer]:
+            - /url: /cortexkit
+          - generic [ref=e71]: /
+          - strong [ref=e72]:
+            - link "magic-context" [ref=e73] [cursor=pointer]:
+              - /url: /cortexkit/magic-context
+          - generic [ref=e74]: Public
+        - generic [ref=e75]:
+          - list:
+            - listitem [ref=e76]:
+              - link "You must be signed in to change notification settings" [ref=e77] [cursor=pointer]:
+                - /url: /login?return_to=%2Fcortexkit%2Fmagic-context
+                - img [ref=e78]
+                - text: Notifications
+            - listitem [ref=e80]:
+              - link "Fork 42" [ref=e81] [cursor=pointer]:
+                - /url: /login?return_to=%2Fcortexkit%2Fmagic-context
+                - img [ref=e82]
+                - text: Fork
+                - generic "42" [ref=e84]
+            - listitem [ref=e85]:
+              - link "You must be signed in to star a repository" [ref=e87] [cursor=pointer]:
+                - /url: /login?return_to=%2Fcortexkit%2Fmagic-context
+                - img [ref=e88]
+                - text: Star
+                - generic "787 users starred this repository" [ref=e90]: "787"
+      - navigation "Repository" [ref=e91]:
+        - list [ref=e92]:
+          - listitem [ref=e93]:
+            - link "Code" [ref=e94] [cursor=pointer]:
+              - /url: /cortexkit/magic-context
+              - img [ref=e95]
+              - generic [ref=e97]: Code
+          - listitem [ref=e98]:
+            - link "Issues 18" [ref=e99] [cursor=pointer]:
+              - /url: /cortexkit/magic-context/issues
+              - img [ref=e100]
+              - generic [ref=e103]: Issues
+              - generic "18" [ref=e104]
+          - listitem [ref=e105]:
+            - link "Pull requests 9" [ref=e106] [cursor=pointer]:
+              - /url: /cortexkit/magic-context/pulls
+              - img [ref=e107]
+              - generic [ref=e109]: Pull requests
+              - generic "9" [ref=e110]
+          - listitem [ref=e111]:
+            - link "Discussions" [ref=e112] [cursor=pointer]:
+              - /url: /cortexkit/magic-context/discussions
+              - img [ref=e113]
+              - generic [ref=e115]: Discussions
+          - listitem [ref=e116]:
+            - link "Actions" [ref=e117] [cursor=pointer]:
+              - /url: /cortexkit/magic-context/actions
+              - img [ref=e118]
+              - generic [ref=e120]: Actions
+          - listitem [ref=e121]:
+            - link "Projects" [ref=e122] [cursor=pointer]:
+              - /url: /cortexkit/magic-context/projects
+              - img [ref=e123]
+              - generic [ref=e125]: Projects
+          - listitem [ref=e126]:
+            - link "Security and quality" [ref=e127] [cursor=pointer]:
+              - /url: /cortexkit/magic-context/security
+              - img [ref=e128]
+              - generic [ref=e130]: Security and quality
+          - listitem [ref=e131]
+        - button "Additional navigation options" [ref=e135] [cursor=pointer]:
+          - img
+    - generic [ref=e143]:
+      - region "Header" [ref=e145]:
+        - generic [ref=e146]:
+          - 'heading "Per-turn reasoning cleanup causes server-side prompt cache bust on every Claude thinking model turn #125" [level=1] [ref=e148]':
+            - text: Per-turn reasoning cleanup causes server-side prompt cache bust on every Claude thinking model turn
+            - generic [ref=e150]: "#125"
+          - generic [ref=e152]:
+            - button "New issue" [ref=e154] [cursor=pointer]:
+              - generic [ref=e156]: New issue
+            - button "Copy link" [ref=e157] [cursor=pointer]:
+              - img [ref=e158]
+      - generic [ref=e166]:
+        - img "Issue" [ref=e167]
+        - text: Open
+      - generic [ref=e171]:
+        - generic [ref=e172]:
+          - generic [ref=e174]:
+            - link "@expiren's profile" [ref=e176] [cursor=pointer]:
+              - /url: https://github.com/expiren
+              - img "@expiren" [ref=e177]
+            - generic [ref=e178]:
+              - heading "Description" [level=2] [ref=e179]
+              - generic [ref=e181]:
+                - generic [ref=e183]:
+                  - generic [ref=e184]:
+                    - link "expiren" [ref=e186] [cursor=pointer]:
+                      - /url: https://github.com/expiren
+                    - generic [ref=e187]:
+                      - text: opened
+                      - link "on Jun 1, 20262 days ago" [ref=e188] [cursor=pointer]:
+                        - /url: https://github.com/cortexkit/magic-context/issues/125#issue-4565916271
+                        - generic "Jun 1, 2026, 8:47 PM GMT+1" [ref=e189]: on Jun 1, 20262 days ago
+                  - button "Issue body actions" [ref=e193] [cursor=pointer]:
+                    - img [ref=e194]
+                - generic [ref=e196]:
+                  - generic [ref=e198]:
+                    - heading "Summary" [level=2] [ref=e199]
+                    - paragraph [ref=e200]:
+                      - text: Magic Context's
+                      - code [ref=e201]: reasoning cleanup
+                      - text: and
+                      - code [ref=e202]: stripClearedReasoning
+                      - text: stages change the conversation body on
+                      - strong [ref=e203]: every turn
+                      - text: for Claude thinking models, causing a complete server-side prompt cache miss (0% hit rate →
+                      - code [ref=e204]: read=0
+                      - text: ) even when the account, endpoint, fingerprint, and system prompt are all identical.
+                    - heading "Environment" [level=2] [ref=e205]
+                    - list [ref=e206]:
+                      - listitem [ref=e207]:
+                        - text: "Magic Context:"
+                        - code [ref=e208]: "@cortexkit/opencode-magic-context@0.21.8"
+                      - listitem [ref=e209]: "Provider: Antigravity proxy (Google Cloud Code Assist) with implicit prefix caching"
+                      - listitem [ref=e210]:
+                        - text: "Model:"
+                        - code [ref=e211]: claude-opus-4-6-thinking
+                        - text: (any Claude thinking model)
+                      - listitem [ref=e212]:
+                        - text: "Plugin:"
+                        - code [ref=e213]: "@expiren/opencode-antigravity-auth@1.6.49"
+                    - heading "Root Cause" [level=2] [ref=e214]
+                    - paragraph [ref=e215]:
+                      - text: Claude thinking models generate
+                      - code [ref=e216]: thinking
+                      - text: blocks in every assistant response. On the
+                      - strong [ref=e217]: next
+                      - text: "turn, MC's Phase 1 transform pipeline runs:"
+                    - list [ref=e218]:
+                      - listitem [ref=e219]:
+                        - code [ref=e220]: reasoning replay
+                        - text: → clears N thinking blocks (N grows each turn)
+                      - listitem [ref=e221]:
+                        - code [ref=e222]: stripClearedReasoning
+                        - text: → strips the cleared parts
+                      - listitem [ref=e223]:
+                        - code [ref=e224]: sentinel replay
+                        - text: → neutralizes stripped messages
+                    - paragraph [ref=e225]:
+                      - text: Because N changes every turn (new thinking blocks from the latest response), the conversation body is
+                      - strong [ref=e226]: different from the previous turn's body
+                      - text: . Google's implicit prefix cache is keyed on exact prefix hash — any change in the conversation messages results in a complete cache miss.
+                    - heading "Evidence from MC Logs" [level=2] [ref=e227]
+                    - paragraph [ref=e228]:
+                      - text: Three consecutive transforms on the
+                      - strong [ref=e229]: same account
+                      - text: ", no account switch, <2 minutes apart:"
+                    - table [ref=e231]:
+                      - rowgroup [ref=e232]:
+                        - row "Field Transform 1 Transform 2 Transform 3" [ref=e233]:
+                          - columnheader "Field" [ref=e234]
+                          - columnheader "Transform 1" [ref=e235]
+                          - columnheader "Transform 2" [ref=e236]
+                          - columnheader "Transform 3" [ref=e237]
+                      - rowgroup [ref=e238]:
+                        - 'row "reasoning replay: cleared= 8 8 10" [ref=e239]':
+                          - 'cell "reasoning replay: cleared=" [ref=e240]':
+                            - code [ref=e241]: "reasoning replay: cleared="
+                          - cell "8" [ref=e242]
+                          - cell "8" [ref=e243]
+                          - cell "10" [ref=e244]:
+                            - strong [ref=e245]: "10"
+                        - 'row "reasoning cleanup: (none) cleared=2 watermark=2437→2467 (none)" [ref=e246]':
+                          - cell "reasoning cleanup:" [ref=e247]:
+                            - code [ref=e248]: "reasoning cleanup:"
+                          - cell "(none)" [ref=e249]:
+                            - emphasis [ref=e250]: (none)
+                          - cell "cleared=2 watermark=2437→2467" [ref=e251]:
+                            - strong [ref=e252]: cleared=2 watermark=2437→2467
+                          - cell "(none)" [ref=e253]:
+                            - emphasis [ref=e254]: (none)
+                        - 'row "stripClearedReasoning: strippedParts= 8 8 10" [ref=e255]':
+                          - 'cell "stripClearedReasoning: strippedParts=" [ref=e256]':
+                            - code [ref=e257]: "stripClearedReasoning: strippedParts="
+                          - cell "8" [ref=e258]
+                          - cell "8" [ref=e259]
+                          - cell "10" [ref=e260]:
+                            - strong [ref=e261]: "10"
+                        - 'row "sentinel replay: neutralized= 3 3 7" [ref=e262]':
+                          - 'cell "sentinel replay: neutralized=" [ref=e263]':
+                            - code [ref=e264]: "sentinel replay: neutralized="
+                          - cell "3" [ref=e265]
+                          - cell "3" [ref=e266]
+                          - cell "7" [ref=e267]:
+                            - strong [ref=e268]: "7"
+                        - row "Output messages 44 40 41" [ref=e269]:
+                          - cell "Output messages" [ref=e270]
+                          - cell "44" [ref=e271]
+                          - cell "40" [ref=e272]
+                          - cell "41" [ref=e273]
+                    - paragraph [ref=e274]:
+                      - text: Transform 2 has
+                      - code [ref=e275]: "reasoning cleanup: cleared=2 watermark=2437→2467"
+                      - text: — two new thinking blocks from the previous assistant response were cleared, advancing the watermark. Transform 3 then strips 10 parts (was 8) because the watermark advanced.
+                    - heading "Corresponding Plugin Cache Stats" [level=2] [ref=e276]
+                    - paragraph [ref=e277]:
+                      - text: These are from the Antigravity plugin's debug output for the same session, same account (
+                      - code [ref=e278]: idx=18
+                      - text: ", no account switch):"
+                    - generic [ref=e279]:
+                      - code [ref=e281]: "Request 1: Cache HIT read=148055 total=148996 hitRate=99% ← previous turn's prefix matched Request 2: Cache MISS read=0 total=149615 hitRate=0% ← complete miss after MC changed the body"
+                      - button "Copy code to clipboard" [ref=e283] [cursor=pointer]:
+                        - img [ref=e284]
+                    - paragraph [ref=e287]:
+                      - text: Total tokens only grew by 619 (148996 → 149615) — a single user message. Yet
+                      - code [ref=e288]: read
+                      - text: dropped from 148055 to
+                      - strong [ref=e289]: "0"
+                      - text: . The entire prefix was invalidated because MC's reasoning cleanup changed the conversation content.
+                    - heading "Impact" [level=2] [ref=e290]
+                    - list [ref=e291]:
+                      - listitem [ref=e292]: Every Claude thinking model turn suffers a complete cache miss (~150K uncached tokens re-processed)
+                      - listitem [ref=e293]: This wastes significant compute quota on the Antigravity proxy
+                      - listitem [ref=e294]: Cache warmup probes become ineffective (probe seeds the cache, MC immediately invalidates it on the next turn)
+                      - listitem [ref=e295]: Hit rate cannot exceed ~50% on average because every other turn is guaranteed to miss
+                    - heading "Expected Behavior" [level=2] [ref=e296]
+                    - paragraph [ref=e297]:
+                      - text: The reasoning stripping result should be
+                      - strong [ref=e298]: idempotent
+                      - text: across turns — if thinking blocks are stripped to the same sentinel structure regardless of how many new blocks were added, the prefix hash would remain stable and the server-side cache would be reused.
+                    - heading "Possible Fixes" [level=2] [ref=e299]
+                    - list [ref=e300]:
+                      - listitem [ref=e301]:
+                        - paragraph [ref=e302]:
+                          - strong [ref=e303]: Stable sentinel replacement
+                          - text: ": Replace all thinking blocks with a fixed-content sentinel (e.g.,"
+                          - code [ref=e304]: "{ text: \".\" }"
+                          - text: ) so the stripped result is identical regardless of which/how many blocks were cleared. The count of sentinels and their content must be deterministic from turn to turn.
+                      - listitem [ref=e305]:
+                        - paragraph [ref=e306]:
+                          - strong [ref=e307]: Watermark-stable stripping
+                          - text: ": Apply reasoning cleanup at a fixed watermark position rather than advancing it each turn, so parts already stripped remain in the same sentinel form."
+                      - listitem [ref=e308]:
+                        - paragraph [ref=e309]:
+                          - strong [ref=e310]: One-time strip at generation time
+                          - text: ": Strip thinking blocks immediately when the assistant response is received (before it enters OpenCode's history), rather than re-stripping on every subsequent turn. This way the history content is already clean and doesn't change."
+                    - heading "Reproduction" [level=2] [ref=e311]
+                    - list [ref=e312]:
+                      - listitem [ref=e313]:
+                        - text: Use any Claude thinking model (e.g.,
+                        - code [ref=e314]: claude-opus-4-6-thinking
+                        - text: ) with Magic Context enabled
+                      - listitem [ref=e315]: Send 3+ messages in a conversation
+                      - listitem [ref=e316]:
+                        - text: "Observe MC logs:"
+                        - code [ref=e317]: "reasoning replay: cleared=N"
+                        - text: where N increases each turn
+                      - listitem [ref=e318]: "Observe provider cache stats: alternating HIT/MISS pattern or consistent MISS on every other turn"
+                    - heading "Related" [level=2] [ref=e319]
+                    - paragraph [ref=e320]:
+                      - text: The
+                      - code [ref=e321]: message.updated
+                      - text: events with
+                      - code [ref=e322]: hasUsageTokens=false
+                      - text: being counted as cache BUSTs in MC diagnostics is a separate but related issue — it inflates the BUST count in MC's own metrics for Antigravity Claude models.
+                  - generic:
+                    - toolbar "Reactions"
+          - generic [ref=e324]:
+            - generic [ref=e325]:
+              - heading "Activity" [level=2] [ref=e326]
+              - generic [ref=e328]:
+                - link "@ualtinok's profile" [ref=e329] [cursor=pointer]:
+                  - /url: https://github.com/ualtinok
+                  - img "ualtinok" [ref=e330]
+                - generic [ref=e337]:
+                  - generic [ref=e339]:
+                    - heading "ualtinok commented on Jun 2, 2026 yesterday" [level=3] [ref=e340]:
+                      - text: ualtinok commented
+                      - generic "Jun 2, 2026, 3:22 PM GMT+1" [ref=e341]: on Jun 2, 2026 yesterday
+                    - generic [ref=e342]:
+                      - link "ualtinok" [ref=e344] [cursor=pointer]:
+                        - /url: /ualtinok
+                      - link "on Jun 2, 2026yesterday" [ref=e347] [cursor=pointer]:
+                        - /url: https://github.com/cortexkit/magic-context/issues/125#issuecomment-4603354518
+                        - generic "Jun 2, 2026, 3:22 PM GMT+1" [ref=e348]: on Jun 2, 2026yesterday
+                    - generic [ref=e349]:
+                      - button "Last edited by ualtinok" [ref=e352] [cursor=pointer]:
+                        - generic [ref=e355]: Last edited by ualtinok
+                        - generic:
+                          - img
+                      - generic [ref=e356]:
+                        - generic "This user has previously committed to the magic-context repository." [ref=e358]: Contributor
+                        - button "Actions for ualtinok's comment, 3:22 PM yesterday" [ref=e360] [cursor=pointer]:
+                          - img [ref=e361]
+                  - generic [ref=e363]:
+                    - generic [ref=e365]:
+                      - paragraph [ref=e366]: Hi, magic-context should never bust the cache on non execute passes. (and this is probably the most audited part of MC as cache stability is our north star). Every drop is deferred until the execute pass (or ttl pass or system prompt change).
+                      - paragraph [ref=e367]:
+                        - text: I'm pretty sure it's related to the antigravity plugin you're using (it seems you're also maintaining). Also would be much better if you can use
+                        - code [ref=e368]: npx @cortexkit/magic-context@latest doctor --issue
+                        - text: to open the issue so that we can see the logs.
+                      - paragraph [ref=e369]: Thanks
+                    - toolbar "Reactions"
+            - generic [ref=e370]:
+              - link "Sign up for free" [ref=e371] [cursor=pointer]:
+                - /url: /signup?return_to=https://github.com/cortexkit/magic-context/issues/125
+                - generic [ref=e373]: Sign up for free
+              - generic [ref=e374]:
+                - strong [ref=e375]: to join this conversation on GitHub.
+                - text: Already have an account?
+              - link "Sign in to comment" [ref=e376] [cursor=pointer]:
+                - /url: /login?return_to=https://github.com/cortexkit/magic-context/issues/125
+        - generic [ref=e378]:
+          - heading "Metadata" [level=2] [ref=e379]
+          - generic [ref=e381]:
+            - generic [ref=e383]:
+              - generic [ref=e384]:
+                - heading "Assignees" [level=3]
+              - generic [ref=e385]: No one assigned
+            - generic [ref=e387]:
+              - generic [ref=e388]:
+                - heading "Labels" [level=3]
+              - generic [ref=e389]: No labels
+            - generic [ref=e391]:
+              - generic [ref=e392]:
+                - heading "Type" [level=3]
+              - generic [ref=e393]: No type
+            - generic [ref=e394]:
+              - generic [ref=e396]:
+                - heading "Fields" [level=3] [ref=e397]
+                - link "Give feedback" [ref=e398] [cursor=pointer]:
+                  - /url: https://github.com/orgs/community/discussions/189141
+              - generic [ref=e400]: No fields configured for issues without a type.
+            - generic [ref=e402]:
+              - generic [ref=e403]:
+                - heading "Projects" [level=3]
+              - generic [ref=e404]: No projects
+            - generic [ref=e406]:
+              - generic [ref=e407]:
+                - heading "Milestone" [level=3]
+              - generic [ref=e408]: No milestone
+            - generic [ref=e410]:
+              - generic [ref=e411]:
+                - heading "Relationships" [level=3]
+              - generic [ref=e412]: None yet
+            - generic [ref=e414]:
+              - generic [ref=e415]:
+                - heading "Development" [level=3]
+              - generic [ref=e416]: No branches or pull requests
+            - heading "Issue actions" [level=2] [ref=e417]
+            - list
+  - contentinfo [ref=e418]:
+    - heading "Footer" [level=2] [ref=e419]
+    - generic [ref=e420]:
+      - generic [ref=e421]:
+        - link "GitHub Homepage" [ref=e422] [cursor=pointer]:
+          - /url: https://github.com
+          - img [ref=e423]
+        - generic [ref=e425]: © 2026 GitHub, Inc.
+      - navigation "Footer" [ref=e426]:
+        - heading "Footer navigation" [level=3] [ref=e427]
+        - list "Footer navigation" [ref=e428]:
+          - listitem [ref=e429]:
+            - link "Terms" [ref=e430] [cursor=pointer]:
+              - /url: https://docs.github.com/site-policy/github-terms/github-terms-of-service
+          - listitem [ref=e431]:
+            - link "Privacy" [ref=e432] [cursor=pointer]:
+              - /url: https://docs.github.com/site-policy/privacy-policies/github-privacy-statement
+          - listitem [ref=e433]:
+            - link "Security" [ref=e434] [cursor=pointer]:
+              - /url: https://github.com/security
+          - listitem [ref=e435]:
+            - link "Status" [ref=e436] [cursor=pointer]:
+              - /url: https://www.githubstatus.com/
+          - listitem [ref=e437]:
+            - link "Community" [ref=e438] [cursor=pointer]:
+              - /url: https://github.community/
+          - listitem [ref=e439]:
+            - link "Docs" [ref=e440] [cursor=pointer]:
+              - /url: https://docs.github.com/
+          - listitem [ref=e441]:
+            - link "Contact" [ref=e442] [cursor=pointer]:
+              - /url: https://support.github.com?tags=dotcom-footer
+          - listitem [ref=e443]:
+            - button "Manage cookies" [ref=e445] [cursor=pointer]
+          - listitem [ref=e446]:
+            - button "Do not share my personal information" [ref=e448] [cursor=pointer]

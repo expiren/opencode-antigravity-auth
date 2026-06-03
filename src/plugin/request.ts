@@ -429,6 +429,16 @@ function sanitizeRequestPayloadForAntigravity(payload: Record<string, unknown>):
           if (!isValidRequestPart(part)) {
             return { text: "." };
           }
+          // Normalize empty/whitespace-only text parts to our sentinel value.
+          // Magic Context strips thinking blocks to { text: "" } sentinels,
+          // while our plugin strips to { text: "." }. Without normalization,
+          // the prefix differs on MC execute passes, busting the prompt cache.
+          if (part.text !== undefined && (typeof part.text !== "string" || part.text.trim().length === 0)) {
+            const sentinel: Record<string, unknown> = { text: "." };
+            if (part.cache_control) sentinel.cache_control = part.cache_control;
+            if (part.cacheControl) sentinel.cacheControl = part.cacheControl;
+            return sentinel;
+          }
           return part;
         }).map((part: any) => {
           if (part && typeof part === "object" && part.functionCall) {
