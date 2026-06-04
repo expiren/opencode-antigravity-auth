@@ -460,6 +460,28 @@ export const AntigravityConfigSchema = z.object({
     * @env OPENCODE_ANTIGRAVITY_PROACTIVE_ROTATION_THRESHOLD
     */
    proactive_rotation_threshold_percent: z.number().min(0).max(100).default(20),
+
+   /**
+    * Sentinel text used to replace stripped Claude thinking blocks.
+    * Controls what placeholder text replaces thinking blocks in conversation history
+    * to prevent the Antigravity proxy from rejecting the request.
+    *
+    * Presets:
+    * - "dot"   → "."      (default, strip/trim-immune, minimal footprint)
+    * - "space" → " "      (works but vulnerable to .strip()/.trim() tightening)
+    * - "newline" → "\n"   (works, single whitespace character)
+    * - "zwsp"  → "\u200B" (zero-width space, invisible in output)
+    *
+    * Any other string is used as a custom sentinel value verbatim.
+    * Must be non-empty — the Antigravity proxy drops empty text via Python's
+    * falsy guard (`if part.text:`), causing `text.text: Field required` errors.
+    *
+    * Only affects Claude models — Gemini uses { text: "" } sentinels matching
+    * Magic Context's makeSentinel() output.
+    *
+    * @default "dot"
+    */
+   claude_thinking_sentinel: z.string().min(1).default("dot"),
    
    // =========================================================================
    // Health Score (used by hybrid strategy)
@@ -537,6 +559,7 @@ export const DEFAULT_CONFIG: AntigravityConfig = {
   quota_refresh_interval_minutes: 30,
   soft_quota_cache_ttl_minutes: "auto",
   proactive_rotation_threshold_percent: 20,
+  claude_thinking_sentinel: "dot",
   auto_update: true,  signature_cache: {
     enabled: true,
     memory_ttl_seconds: 3600,

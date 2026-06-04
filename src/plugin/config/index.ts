@@ -28,4 +28,5 @@ export {
   configExists,
   initRuntimeConfig,
   getKeepThinking,
+  getClaudeSentinelText,
 } from "./loader";

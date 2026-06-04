@@ -162,3 +162,15 @@ export function initRuntimeConfig(config: AntigravityConfig): void {
 export function getKeepThinking(): boolean {
   return runtimeConfig?.keep_thinking ?? false;
 }
+
+const SENTINEL_PRESETS: Record<string, string> = {
+  dot: ".",
+  space: " ",
+  newline: "\n",
+  zwsp: "\u200B",
+}
+
+export function getClaudeSentinelText(): string {
+  const raw = runtimeConfig?.claude_thinking_sentinel ?? "dot"
+  return SENTINEL_PRESETS[raw] ?? raw
+}

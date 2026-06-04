@@ -8,7 +8,7 @@ import {
   getRandomizedHeaders,
   type HeaderStyle,
 } from "../constants";import { cacheSignature, getCachedSignature } from "./cache";
-import { getKeepThinking } from "./config";
+import { getKeepThinking, getClaudeSentinelText } from "./config";
 import {
   createStreamingTransformer,
   transformSseLine,
@@ -408,7 +408,7 @@ function isValidRequestPart(part: unknown): boolean {
   );
 }
 
-function sanitizeRequestPayloadForAntigravity(payload: Record<string, unknown>): void {
+function sanitizeRequestPayloadForAntigravity(payload: Record<string, unknown>, isClaudeRequest = false): void {
   const anyPayload = payload as any;
 
   if (Array.isArray(anyPayload.contents)) {
@@ -423,12 +423,13 @@ function sanitizeRequestPayloadForAntigravity(payload: Record<string, unknown>):
         const rawParts = Array.isArray(contentRecord.parts) ? contentRecord.parts : [];
         let foundFirstFunctionCall = false;
 
+        const emptyTextValue = isClaudeRequest ? getClaudeSentinelText() : ""
         const sanitizedParts = rawParts.map((part: any) => {
           if (!isValidRequestPart(part)) {
-            return { text: "" };
+            return { text: emptyTextValue };
           }
           if (part.text !== undefined && (typeof part.text !== "string" || part.text.trim().length === 0)) {
-            const sentinel: Record<string, unknown> = { text: "" };
+            const sentinel: Record<string, unknown> = { text: emptyTextValue };
             if (part.cache_control) sentinel.cache_control = part.cache_control;
             if (part.cacheControl) sentinel.cacheControl = part.cacheControl;
             return sentinel;
@@ -497,7 +498,8 @@ function sanitizeRequestPayloadForAntigravity(payload: Record<string, unknown>):
         if (blockRecord.type === "text") {
           const text = blockRecord.text
           if (typeof text !== "string" || text.trim().length === 0) {
-            const sentinel: Record<string, unknown> = { type: "text", text: "" }
+            const sentinelText = isClaudeRequest ? getClaudeSentinelText() : ""
+            const sentinel: Record<string, unknown> = { type: "text", text: sentinelText }
             if (blockRecord.cache_control !== undefined) sentinel.cache_control = blockRecord.cache_control
             return sentinel
           }
@@ -692,9 +694,7 @@ function ensureThinkingBeforeToolUseInContents(contents: any[], signatureSession
     const newParts = parts.map(p => {
       if (!isGeminiThinkingPart(p)) return p;
       const cc = (p as Record<string, unknown>).cache_control;
-      // Use plain empty text part — thinking-format sentinels get converted by the proxy
-      // into Claude thinking blocks missing the required `thinking` field.
-      const sentinel: Record<string, unknown> = { text: "." };
+      const sentinel: Record<string, unknown> = { text: getClaudeSentinelText() };
       if (cc) sentinel.cache_control = cc;
       return sentinel;
     });
@@ -794,9 +794,7 @@ function ensureThinkingBeforeToolUseInMessages(messages: any[], signatureSession
       if (!isThinkingBlock(b)) return b;
       const thinkingText = lastThinking ? lastThinking.text : (typeof b.thinking === "string" ? b.thinking : typeof b.text === "string" ? b.text : "");
       const cc = (b as Record<string, unknown>).cache_control;
-      // Use plain empty text part — thinking-format sentinels get converted by the proxy
-      // into Claude thinking blocks missing the required `thinking` field.
-      const sentinel: Record<string, unknown> = { text: "." };
+      const sentinel: Record<string, unknown> = { text: getClaudeSentinelText() };
       if (cc) sentinel.cache_control = cc;
       return sentinel;
     }) };
@@ -1569,7 +1567,7 @@ export function prepareAntigravityRequest(
         }
 
         stripInjectedDebugFromRequestPayload(requestPayload);
-        sanitizeRequestPayloadForAntigravity(requestPayload);
+        sanitizeRequestPayloadForAntigravity(requestPayload, isClaude);
         const effectiveProjectId = projectId?.trim() || (headerStyle === "antigravity" ? generateSyntheticProjectId() : "");
         resolvedProjectId = effectiveProjectId;
 

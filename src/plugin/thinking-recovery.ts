@@ -9,6 +9,8 @@
  * we abandon the corrupted turn and let Claude generate fresh thinking.
  */
 
+import { getClaudeSentinelText } from "./config";
+
 // ============================================================================
 // TYPES
 // ============================================================================
@@ -195,10 +197,7 @@ function stripAllThinkingBlocks(contents: any[]): any[] {
     if (Array.isArray(content.parts)) {
       const mappedParts = content.parts.map((part: any) => {
         if (!isThinkingPart(part)) return part;
-        // Replace with Gemini-format sentinel preserving cache_control
-        // Use plain empty text part — thinking-format sentinels get converted by the proxy
-        // into Claude thinking blocks missing the required `thinking` field.
-        const sentinel: Record<string, unknown> = { text: "." };
+        const sentinel: Record<string, unknown> = { text: getClaudeSentinelText() };
         if (part.cache_control !== undefined) sentinel.cache_control = part.cache_control;
         return sentinel;
       });
@@ -209,10 +208,7 @@ function stripAllThinkingBlocks(contents: any[]): any[] {
     if (Array.isArray(content.content)) {
       const mappedContent = content.content.map((block: any) => {
         if (block?.type !== "thinking" && block?.type !== "redacted_thinking") return block;
-        // Replace with Anthropic-format sentinel preserving cache_control
-        // Use plain empty text part — thinking-format sentinels get converted by the proxy
-        // into Claude thinking blocks missing the required `thinking` field.
-        const sentinel: Record<string, unknown> = { text: "." };
+        const sentinel: Record<string, unknown> = { text: getClaudeSentinelText() };
         if (block?.cache_control !== undefined) sentinel.cache_control = block.cache_control;
         return sentinel;
       });
