@@ -915,17 +915,22 @@ function isToolBlock(part: Record<string, unknown>): boolean {
 }
 
 function stripAllThinkingBlocks(contentArray: any[], isClaudeModel?: boolean): any[] {
-  // Claude: use .map() + sentinel to preserve array indices and cache_control markers.
+  // Claude: use .map() + { text: "." } sentinel to preserve array indices and cache_control markers.
   // The Antigravity proxy handles { text: "." } sentinels correctly for Claude.
-  // Gemini: use .filter() to remove thinking blocks entirely.
-  // Gemini treats { text: "." } as literal content and echoes dots back in output.
+  // Gemini: use .map() + { text: "" } sentinel to preserve array indices for cache stability.
+  // Gemini echoes { text: "." } as literal dots in output, but treats { text: "" } as empty/invisible.
   if (isClaudeModel === false) {
-    // Gemini path: remove thinking blocks entirely
-    return contentArray.filter(item => {
-      if (!item || typeof item !== "object") return true;
-      if (isToolBlock(item)) return true;
-      if (isThinkingPart(item) || hasSignatureField(item)) return false;
-      return true;
+    // Gemini path: replace thinking blocks with empty-text sentinels
+    return contentArray.map(item => {
+      if (!item || typeof item !== "object") return item;
+      if (isToolBlock(item)) return item;
+      if (isThinkingPart(item) || hasSignatureField(item)) {
+        const cc = (item as Record<string, unknown>).cache_control;
+        const sentinel: Record<string, unknown> = { text: "" };
+        if (cc) sentinel.cache_control = cc;
+        return sentinel;
+      }
+      return item;
     });
   }
 
