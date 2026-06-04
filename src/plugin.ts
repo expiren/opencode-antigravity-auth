@@ -1112,7 +1112,8 @@ function getRateLimitBackoff(
   // Check if this is a duplicate 429 within the dedup window
   if (previous && (now - previous.lastAt < RATE_LIMIT_DEDUP_WINDOW_MS)) {
     // Same rate limit event from concurrent request - don't increment
-    const baseDelay = serverRetryAfterMs ?? 1000;
+    const rawDelay = serverRetryAfterMs ?? 1000;
+    const baseDelay = Math.min(rawDelay, maxBackoffMs); // Cap server value to prevent defeating maxBackoffMs
     const backoffDelay = Math.min(baseDelay * Math.pow(2, previous.consecutive429 - 1), maxBackoffMs);
     return { 
       attempt: previous.consecutive429, 
@@ -1132,7 +1133,8 @@ function getRateLimitBackoff(
     quotaKey 
   });
   
-  const baseDelay = serverRetryAfterMs ?? 1000;
+  const rawDelay = serverRetryAfterMs ?? 1000;
+  const baseDelay = Math.min(rawDelay, maxBackoffMs); // Cap server value to prevent defeating maxBackoffMs
   const backoffDelay = Math.min(baseDelay * Math.pow(2, attempt - 1), maxBackoffMs);
   return { attempt, delayMs: Math.max(baseDelay, backoffDelay), isDuplicate: false };
 }
@@ -1598,7 +1600,7 @@ export const createAntigravityPlugin = (providerId: string) => async (
           };
 
           let accountSwitchCount = 0;
-          const maxAccountSwitches = config.max_account_switches ?? 2;
+          const maxAccountSwitches = config.max_account_switches ?? 10;
           let previousAccountIndex = -1;
           let needsCacheWarmup = false;
 

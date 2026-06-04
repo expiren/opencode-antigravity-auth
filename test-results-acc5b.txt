@@ -1,0 +1,11 @@
+Using account[5]: ian.willistufi@andmart.com.br
+Token refreshed OK
+Onboarding account to get project ID...
+  onboard attempt 0: {"error":{"code":403,"message":"To use Antigravity for individuals, ask your administrator to enable access for your account. To use Gemini Code Assist with a Workspace subscription your organization 
+  onboard attempt 1: {"error":{"code":403,"message":"To use Antigravity for individuals, ask your administrator to enable access for your account. To use Gemini Code Assist with a Workspace subscription your organization 
+  onboard attempt 2: {"error":{"code":403,"message":"To use Antigravity for individuals, ask your administrator to enable access for your account. To use Gemini Code Assist with a Workspace subscription your organization 
+  onboard attempt 3: {"error":{"code":403,"message":"To use Antigravity for individuals, ask your administrator to enable access for your account. To use Gemini Code Assist with a Workspace subscription your organization 
+  onboard attempt 4: {"error":{"code":403,"message":"To use Antigravity for individuals, ask your administrator to enable access for your account. To use Gemini Code Assist with a Workspace subscription your organization 
+Error: Failed to onboard account after 5 attempts
+    at onboardAccount (file:///D:/Projects/opencode-antigravity-auth/test-sentinel-multiturn.mjs:175:25)
+    at async main (file:///D:/Projects/opencode-antigravity-auth/test-sentinel-multiturn.mjs:185:17)

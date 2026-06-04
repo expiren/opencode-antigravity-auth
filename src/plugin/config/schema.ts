@@ -347,7 +347,7 @@ export const AntigravityConfigSchema = z.object({
      * Env override: OPENCODE_ANTIGRAVITY_MAX_ACCOUNT_SWITCHES
      * @default 2
      */
-    max_account_switches: z.number().min(0).max(50).default(2),
+    max_account_switches: z.number().min(0).max(50).default(10),
 
     /**
      * Allow falling back between quota pools (antigravity ↔ gemini-cli) when rate-limited.
@@ -526,7 +526,7 @@ export const DEFAULT_CONFIG: AntigravityConfig = {
   account_selection_strategy: 'hybrid',
   pid_offset_enabled: false,
   switch_on_first_rate_limit: true,
-  max_account_switches: 2,
+  max_account_switches: 10,
   quota_style_fallback: false,
   scheduling_mode: 'cache_first',  max_cache_first_wait_seconds: 60,
   failure_ttl_seconds: 3600,

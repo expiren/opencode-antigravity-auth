@@ -1,0 +1,6 @@
+Using account[10]: isabella.wyattdkfl@andmart.com.br
+Token refreshed OK
+Onboarding account to get project ID...
+Error: Failed to onboard account
+    at onboardAccount (file:///D:/Projects/opencode-antigravity-auth/test-sentinel-multiturn.mjs:170:25)
+    at async main (file:///D:/Projects/opencode-antigravity-auth/test-sentinel-multiturn.mjs:178:21)
