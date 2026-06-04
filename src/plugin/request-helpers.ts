@@ -914,36 +914,15 @@ function isToolBlock(part: Record<string, unknown>): boolean {
     || part.functionResponse !== undefined;
 }
 
-function stripAllThinkingBlocks(contentArray: any[], isClaudeModel?: boolean): any[] {
-  // Claude: use .map() + { text: "." } sentinel to preserve array indices and cache_control markers.
-  // The Antigravity proxy handles { text: "." } sentinels correctly for Claude.
-  // Gemini: use .map() + { text: "" } sentinel to preserve array indices for cache stability.
-  // Gemini echoes { text: "." } as literal dots in output, but treats { text: "" } as empty/invisible.
-  if (isClaudeModel === false) {
-    // Gemini path: replace thinking blocks with empty-text sentinels
-    return contentArray.map(item => {
-      if (!item || typeof item !== "object") return item;
-      if (isToolBlock(item)) return item;
-      if (isThinkingPart(item) || hasSignatureField(item)) {
-        const cc = (item as Record<string, unknown>).cache_control;
-        const sentinel: Record<string, unknown> = { text: "" };
-        if (cc) sentinel.cache_control = cc;
-        return sentinel;
-      }
-      return item;
-    });
-  }
-
-  // Claude path: replace with sentinels to preserve array structure
+function stripAllThinkingBlocks(contentArray: any[]): any[] {
+  // Replace thinking blocks with { text: "" } sentinels matching MC's makeSentinel() output.
+  // Preserves array indices and cache_control markers for prompt cache stability.
   return contentArray.map(item => {
     if (!item || typeof item !== "object") return item;
     if (isToolBlock(item)) return item;
     if (isThinkingPart(item) || hasSignatureField(item)) {
-      // Preserve cache_control from stripped thinking parts
       const cc = (item as Record<string, unknown>).cache_control;
-      // Use plain empty text part — thinking-format sentinels get converted by the proxy
-      // into Claude thinking blocks missing the required `thinking` field.
-      const sentinel: Record<string, unknown> = { text: "." };
+      const sentinel: Record<string, unknown> = { text: "" };
       if (cc) sentinel.cache_control = cc;
       return sentinel;
     }
@@ -971,7 +950,7 @@ function removeTrailingThinkingBlocks(
 
     // Replace with sentinel instead of popping — preserves array length
     const cc = part?.cache_control;
-    const sentinel: Record<string, unknown> = { text: "." };
+    const sentinel: Record<string, unknown> = { text: "" };
     if (cc) sentinel.cache_control = cc;
     result[i] = sentinel;
   }
@@ -1155,7 +1134,7 @@ function filterContentArray(
   // changing Google's implicit prefix cache hash.
   // Only exception: Claude with keep_thinking=true uses signature-aware filtering below.
   if (isClaudeModel === false || !getKeepThinking()) {
-    return stripAllThinkingBlocks(contentArray, isClaudeModel);
+    return stripAllThinkingBlocks(contentArray);
   }
 
   const filtered: any[] = [];
@@ -1192,7 +1171,7 @@ function filterContentArray(
     if (isClaudeModel && (isThinking || hasSignature)) {
       // Use plain empty text part — thinking-format sentinels get converted by the proxy
       // into Claude thinking blocks with missing required fields
-      const sentinel: Record<string, unknown> = { text: "." };
+      const sentinel: Record<string, unknown> = { text: "" };
       if (item.cache_control) sentinel.cache_control = item.cache_control;
       filtered.push(sentinel);
       continue;
@@ -1210,7 +1189,7 @@ function filterContentArray(
           filtered.push(sanitized);
         } else {
           // sanitizeThinkingPart returned null — use sentinel to preserve array length
-          const sentinel: Record<string, unknown> = { text: "." };
+          const sentinel: Record<string, unknown> = { text: "" };
           if (item.cache_control) sentinel.cache_control = item.cache_control;
           filtered.push(sentinel);
         }
@@ -1221,7 +1200,7 @@ function filterContentArray(
       const existingSignature = item.signature || item.thoughtSignature;
       const signatureInfo = existingSignature ? `foreign signature (${String(existingSignature).length} chars)` : "no signature";
       log.debug(`Injecting plain text sentinel for last-message thinking block with ${signatureInfo}`);
-      const sentinel: Record<string, unknown> = { text: "." };
+      const sentinel: Record<string, unknown> = { text: "" };
       if (item.cache_control) sentinel.cache_control = item.cache_control;
       filtered.push(sentinel);
       continue;    }
@@ -1232,7 +1211,7 @@ function filterContentArray(
         filtered.push(sanitized);
       } else {
         // sanitizeThinkingPart returned null — use sentinel to preserve array length
-        const sentinel: Record<string, unknown> = { text: "." };
+        const sentinel: Record<string, unknown> = { text: "" };
         if (item.cache_control) sentinel.cache_control = item.cache_control;
         filtered.push(sentinel);
       }
@@ -1255,7 +1234,7 @@ function filterContentArray(
             filtered.push(sanitized);
           } else {
             // sanitizeThinkingPart returned null — use sentinel to preserve array length
-            const sentinel: Record<string, unknown> = { text: "." };
+            const sentinel: Record<string, unknown> = { text: "" };
             if (item.cache_control) sentinel.cache_control = item.cache_control;
             filtered.push(sentinel);
           }
@@ -1266,7 +1245,7 @@ function filterContentArray(
 
     // Catch-all: thinking/signature part that didn't match any branch above
     // Use sentinel instead of silently dropping to preserve array length
-    const sentinel: Record<string, unknown> = { text: "." };
+    const sentinel: Record<string, unknown> = { text: "" };
     if (item.cache_control) sentinel.cache_control = item.cache_control;
     filtered.push(sentinel);
   }

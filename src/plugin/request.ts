@@ -345,7 +345,7 @@ function stripInjectedDebugFromParts(parts: unknown): unknown {
 
     // Replace debug blocks and synthetic thinking placeholders with empty text sentinel
     if (text && (text.startsWith(DEBUG_MESSAGE_PREFIX) || text.startsWith(SYNTHETIC_THINKING_PLACEHOLDER.trim()))) {
-      const sentinel: Record<string, unknown> = { text: "." };
+      const sentinel: Record<string, unknown> = { text: "" };
       if (record.cache_control !== undefined) sentinel.cache_control = record.cache_control;
       return sentinel;
     }
@@ -408,18 +408,15 @@ function isValidRequestPart(part: unknown): boolean {
   );
 }
 
-function sanitizeRequestPayloadForAntigravity(payload: Record<string, unknown>, isClaudeModel?: boolean): void {
+function sanitizeRequestPayloadForAntigravity(payload: Record<string, unknown>): void {
   const anyPayload = payload as any;
-  // Claude: normalize empty text to "." (proxy absorbs it during format conversion).
-  // Gemini: keep empty text as "" (Gemini echoes "." as literal dots in output).
-  const emptySentinelText = isClaudeModel === false ? "" : ".";
 
   if (Array.isArray(anyPayload.contents)) {
     // Use .map() instead of .map().filter() to preserve array indices for prompt cache stability
     anyPayload.contents = anyPayload.contents
       .map((content: unknown) => {
         if (!content || typeof content !== "object") {
-          return { role: "user", parts: [{ text: emptySentinelText }] };
+          return { role: "user", parts: [{ text: "" }] };
         }
 
         const contentRecord = content as Record<string, unknown>;
@@ -428,14 +425,10 @@ function sanitizeRequestPayloadForAntigravity(payload: Record<string, unknown>, 
 
         const sanitizedParts = rawParts.map((part: any) => {
           if (!isValidRequestPart(part)) {
-            return { text: emptySentinelText };
+            return { text: "" };
           }
-          // Normalize empty/whitespace-only text parts to the model-appropriate sentinel.
-          // MC strips thinking to { text: "" }; Claude plugin strips to { text: "." }.
-          // For Claude: normalize MC's "" → "." so both match.
-          // For Gemini: both MC and plugin use "" — skip normalization to avoid dot echo.
           if (part.text !== undefined && (typeof part.text !== "string" || part.text.trim().length === 0)) {
-            const sentinel: Record<string, unknown> = { text: emptySentinelText };
+            const sentinel: Record<string, unknown> = { text: "" };
             if (part.cache_control) sentinel.cache_control = part.cache_control;
             if (part.cacheControl) sentinel.cacheControl = part.cacheControl;
             return sentinel;
@@ -472,7 +465,7 @@ function sanitizeRequestPayloadForAntigravity(payload: Record<string, unknown>, 
         });
 
         if (sanitizedParts.length === 0) {
-          return { ...contentRecord, parts: [{ text: emptySentinelText }] };
+          return { ...contentRecord, parts: [{ text: "" }] };
         }
 
         return {
@@ -485,7 +478,7 @@ function sanitizeRequestPayloadForAntigravity(payload: Record<string, unknown>, 
   if (Array.isArray(anyPayload.messages)) {
     anyPayload.messages = anyPayload.messages.map((message: unknown) => {
       if (!message || typeof message !== "object") {
-        return { role: "user", content: [{ type: "text", text: emptySentinelText }] }
+        return { role: "user", content: [{ type: "text", text: "" }] }
       }
 
       const messageRecord = message as Record<string, unknown>
@@ -497,14 +490,14 @@ function sanitizeRequestPayloadForAntigravity(payload: Record<string, unknown>, 
 
       const sanitizedContent = rawContent.map((block: unknown) => {
         if (!block || typeof block !== "object") {
-          return { type: "text", text: emptySentinelText }
+          return { type: "text", text: "" }
         }
 
         const blockRecord = block as Record<string, unknown>
         if (blockRecord.type === "text") {
           const text = blockRecord.text
           if (typeof text !== "string" || text.trim().length === 0) {
-            const sentinel: Record<string, unknown> = { type: "text", text: emptySentinelText }
+            const sentinel: Record<string, unknown> = { type: "text", text: "" }
             if (blockRecord.cache_control !== undefined) sentinel.cache_control = blockRecord.cache_control
             return sentinel
           }
@@ -514,7 +507,7 @@ function sanitizeRequestPayloadForAntigravity(payload: Record<string, unknown>, 
       })
 
       if (sanitizedContent.length === 0) {
-        return { ...messageRecord, content: [{ type: "text", text: emptySentinelText }] }
+        return { ...messageRecord, content: [{ type: "text", text: "" }] }
       }
 
       return {
@@ -533,12 +526,12 @@ function sanitizeRequestPayloadForAntigravity(payload: Record<string, unknown>, 
       const sanitizedSystemParts = sys.parts.map((part: unknown) => {
         if (isValidRequestPart(part)) return part;
         const record = part as Record<string, unknown>;
-        const sentinel: Record<string, unknown> = { text: emptySentinelText };
+        const sentinel: Record<string, unknown> = { text: "" };
         if (record?.cache_control !== undefined) sentinel.cache_control = record.cache_control;
         return sentinel;
       });
       const hasRealContent = sanitizedSystemParts.some((p: any) =>
-        p && typeof p === "object" && typeof p.text === "string" && p.text !== emptySentinelText && p.text.trim().length > 0
+        p && typeof p === "object" && typeof p.text === "string" && p.text !== "" && p.text.trim().length > 0
       );
       if (hasRealContent) {
         sys.parts = sanitizedSystemParts;
@@ -1576,7 +1569,7 @@ export function prepareAntigravityRequest(
         }
 
         stripInjectedDebugFromRequestPayload(requestPayload);
-        sanitizeRequestPayloadForAntigravity(requestPayload, isClaude);
+        sanitizeRequestPayloadForAntigravity(requestPayload);
         const effectiveProjectId = projectId?.trim() || (headerStyle === "antigravity" ? generateSyntheticProjectId() : "");
         resolvedProjectId = effectiveProjectId;
 
