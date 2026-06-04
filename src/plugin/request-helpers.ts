@@ -914,13 +914,22 @@ function isToolBlock(part: Record<string, unknown>): boolean {
     || part.functionResponse !== undefined;
 }
 
-/**
- * Unconditionally strips ALL thinking/reasoning blocks from a content array.
- * Used for both Claude and Gemini models — both regenerate fresh thinking each turn.
- * Stripping prevents cache instability from MC execute passes replacing thinking
- * content with sentinels mid-conversation (changing the prefix hash).
- */
-function stripAllThinkingBlocks(contentArray: any[]): any[] {
+function stripAllThinkingBlocks(contentArray: any[], isClaudeModel?: boolean): any[] {
+  // Claude: use .map() + sentinel to preserve array indices and cache_control markers.
+  // The Antigravity proxy handles { text: "." } sentinels correctly for Claude.
+  // Gemini: use .filter() to remove thinking blocks entirely.
+  // Gemini treats { text: "." } as literal content and echoes dots back in output.
+  if (isClaudeModel === false) {
+    // Gemini path: remove thinking blocks entirely
+    return contentArray.filter(item => {
+      if (!item || typeof item !== "object") return true;
+      if (isToolBlock(item)) return true;
+      if (isThinkingPart(item) || hasSignatureField(item)) return false;
+      return true;
+    });
+  }
+
+  // Claude path: replace with sentinels to preserve array structure
   return contentArray.map(item => {
     if (!item || typeof item !== "object") return item;
     if (isToolBlock(item)) return item;
@@ -1141,7 +1150,7 @@ function filterContentArray(
   // changing Google's implicit prefix cache hash.
   // Only exception: Claude with keep_thinking=true uses signature-aware filtering below.
   if (isClaudeModel === false || !getKeepThinking()) {
-    return stripAllThinkingBlocks(contentArray);
+    return stripAllThinkingBlocks(contentArray, isClaudeModel);
   }
 
   const filtered: any[] = [];
