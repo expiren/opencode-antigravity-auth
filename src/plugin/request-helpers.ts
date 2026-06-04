@@ -916,8 +916,9 @@ function isToolBlock(part: Record<string, unknown>): boolean {
 
 /**
  * Unconditionally strips ALL thinking/reasoning blocks from a content array.
- * Used for Claude models to avoid signature validation errors entirely.
- * Claude will generate fresh thinking for each turn.
+ * Used for both Claude and Gemini models — both regenerate fresh thinking each turn.
+ * Stripping prevents cache instability from MC execute passes replacing thinking
+ * content with sentinels mid-conversation (changing the prefix hash).
  */
 function stripAllThinkingBlocks(contentArray: any[]): any[] {
   return contentArray.map(item => {
@@ -1133,9 +1134,13 @@ function filterContentArray(
   isClaudeModel?: boolean,
   isLastAssistantMessage: boolean = false,
 ): any[] {
-  // For Claude models, strip thinking blocks by default for reliability
-  // User can opt-in to keep thinking via config: { "keep_thinking": true }
-  if (isClaudeModel && !getKeepThinking()) {
+  // Strip ALL thinking blocks for both Claude and Gemini models.
+  // Both model families regenerate fresh thinking each turn — historical
+  // thinking blocks are unnecessary and cause cache instability when
+  // Magic Context execute passes modify their content mid-conversation,
+  // changing Google's implicit prefix cache hash.
+  // Only exception: Claude with keep_thinking=true uses signature-aware filtering below.
+  if (isClaudeModel === false || !getKeepThinking()) {
     return stripAllThinkingBlocks(contentArray);
   }
 

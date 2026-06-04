@@ -13,7 +13,7 @@ opencode-antigravity-auth/
 │   ├── hooks/                    # OpenCode lifecycle hooks
 │   │   └── auto-update-checker/  # Background npm update check + auto-pin
 │   └── plugin/                   # Core plugin subsystems
-│       ├── accounts.ts           # AccountManager: selection, rotation, cooldowns, request counter and session metrics
+│       ├── accounts.ts           # AccountManager: selection, rotation, cooldowns, request counter, session metrics, proactive rotation, and cache-warm preference
 │       ├── auth-doctor.ts        # Self-healing diagnostics for auth storage drift
 │       ├── auth-drift.ts         # Detection of drift between active auth and storage
 │       ├── auth.ts               # Token validation, refresh-parts parsing
@@ -193,7 +193,7 @@ opencode-antigravity-auth/
 
 **New config option:** `src/plugin/config/schema.ts` — add Zod field with default and JSDoc; update `DEFAULT_CONFIG`; add getter in `src/plugin/config/index.ts` if needed
 
-**New account selection strategy:** `src/plugin/accounts.ts` — extend `AccountSelectionStrategy` union; add branch in `AccountManager.selectAccount()`
+**New account selection strategy:** `src/plugin/rotation.ts` — implement the selection algorithm; add selection mode option in `src/plugin/config/schema.ts` if needed, and call/wrap in `src/plugin/accounts.ts`
 
 **New OpenCode hook:** `src/hooks/[hook-name]/` — follow `auto-update-checker/` structure with `index.ts`, `types.ts`, `constants.ts`
 

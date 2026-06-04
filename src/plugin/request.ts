@@ -1444,6 +1444,11 @@ export function prepareAntigravityRequest(
             const hasCachedThinking = defaultSignatureStore.has(signatureSessionKey);
             needsSignedThinkingWarmup = hasToolUse && !hasSignedThinking && !hasCachedThinking;
           }
+        } else {
+          // For non-Claude models (Gemini): strip historical thinking blocks for cache stability.
+          // Gemini regenerates fresh thinking each turn — keeping old thinking blocks causes
+          // cache busts when MC execute passes replace thinking content with sentinels.
+          deepFilterThinkingBlocks(requestPayload, signatureSessionKey, getCachedSignature, false);
         }
 
         // For Claude models, ensure functionCall/tool use parts carry IDs (required by Anthropic).

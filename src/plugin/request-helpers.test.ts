@@ -1,4 +1,6 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+
+vi.mock("./config", () => ({ getKeepThinking: () => true }));
 
 import {
   isThinkingCapableModel,
@@ -63,7 +65,6 @@ describe("sanitizeThinkingPart (covered via filtering)", () => {
     });
 
     expect(result[0].parts[0].providerOptions).toBeUndefined();  });
-
   it("extracts wrapped thinking text and strips SDK fields for Anthropic-style thinking blocks", () => {
     const validSignature = "a".repeat(60);
     const thinkingText = "wrapped thinking";
@@ -99,7 +100,6 @@ describe("sanitizeThinkingPart (covered via filtering)", () => {
       cache_control: { type: "ephemeral" },
     });
   });
-
   it("preserves signatures while dropping cache_control/providerOptions during signature restoration", () => {    const cachedSignature = "c".repeat(60);
     const getCachedSignatureFn = (_sessionId: string, _text: string) => cachedSignature;
 
@@ -129,7 +129,6 @@ describe("sanitizeThinkingPart (covered via filtering)", () => {
       signature: cachedSignature,
     });
   });
-
   it("sanitizes reasoning blocks keeping only allowed fields (type, text, signature)", () => {
     const validSignature = "z".repeat(60);
     const getCachedSignatureFn = (_sessionId: string, _text: string) => validSignature;
@@ -161,8 +160,7 @@ describe("sanitizeThinkingPart (covered via filtering)", () => {
       cache_control: { type: "ephemeral" },
     });
   });
-});
-describe("isThinkingCapableModel", () => {
+});describe("isThinkingCapableModel", () => {
   it("returns true for models with 'thinking' in name", () => {
     expect(isThinkingCapableModel("claude-thinking")).toBe(true);
     expect(isThinkingCapableModel("CLAUDE-THINKING-4")).toBe(true);
@@ -683,7 +681,8 @@ describe("filterMessagesThinkingBlocks", () => {
     });
   });
 
-  it("handles Gemini-style thought blocks inside messages content with cached signatures", () => {    const validSignature = "b".repeat(60);
+  it("handles Gemini-style thought blocks inside messages content with cached signatures", () => {
+    const validSignature = "b".repeat(60);
     const thinkingText = "wrapped thought";
     const getCachedSignatureFn = (_sessionId: string, text: string) =>
       text === thinkingText ? validSignature : undefined;
