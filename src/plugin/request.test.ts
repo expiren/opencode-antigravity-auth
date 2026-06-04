@@ -1083,10 +1083,10 @@ it("removes x-api-key header", () => {
       // Entry with valid parts keeps them (invalid parts replaced with sentinel to preserve indices)
       expect(wrapped.request.contents[1]).toEqual({
         role: "model",
-        parts: [{ text: "." }, { text: "kept" }],
+        parts: [{ text: "" }, { text: "kept" }],
       });
       // systemInstruction parts: null replaced with sentinel, valid parts kept
-      expect(wrapped.request.systemInstruction.parts).toEqual([{ text: "." }, { text: "system kept" }]);
+      expect(wrapped.request.systemInstruction.parts).toEqual([{ text: "" }, { text: "system kept" }]);
     });
 
     it("drops systemInstruction when all parts are invalid", () => {
