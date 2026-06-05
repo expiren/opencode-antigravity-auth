@@ -2770,14 +2770,9 @@ export const createAntigravityPlugin = (providerId: string) => async (
                     ? acc.coolingDownUntil - now
                     : undefined;
 
-                  // Age-gate quota data: ignore cached quota older than 60 minutes
-                  // to prevent stale exhaustion data from persisting in the UI.
-                  // AccountManager applies the same protection during account selection.
                   const DISPLAY_QUOTA_MAX_AGE_MS = 60 * 60 * 1000;
                   const quotaIsStale = acc.cachedQuotaUpdatedAt == null
                     || (now - acc.cachedQuotaUpdatedAt) > DISPLAY_QUOTA_MAX_AGE_MS;
-                  const displayQuota = quotaIsStale ? undefined : acc.cachedQuota;
-                  const displayPerModelQuota = quotaIsStale ? undefined : acc.cachedPerModelQuota;
 
                   return {
                     email: acc.email,
@@ -2790,8 +2785,8 @@ export const createAntigravityPlugin = (providerId: string) => async (
                     quotaSummary: quotaIsStale ? undefined : formatCachedQuotaSummary(acc),
                     cooldownMs,
                     cooldownReason: cooldownMs ? acc.cooldownReason : undefined,
-                    cachedQuota: displayQuota,
-                    cachedPerModelQuota: displayPerModelQuota,
+                    cachedQuota: acc.cachedQuota,
+                    cachedPerModelQuota: acc.cachedPerModelQuota,
                     fingerprintHistory: acc.fingerprintHistory,
                   };                });
                 
@@ -2917,6 +2912,20 @@ export const createAntigravityPlugin = (providerId: string) => async (
                         acc.cachedQuota = res.quota.groups;
                         acc.cachedPerModelQuota = res.quota.perModel;
                         acc.cachedQuotaUpdatedAt = Date.now();
+
+                        // Clear stale rate-limit lockouts when quota API confirms
+                        // the account has remaining capacity. This prevents false
+                        // "rate-limited" counts from persisted 7-day QUOTA_EXHAUSTED
+                        // lockouts that are no longer accurate.
+                        const hasAnyQuota = Object.values(res.quota.groups).some(
+                          (g) => typeof g.remainingFraction === "number" && g.remainingFraction > 0
+                        );
+                        if (hasAnyQuota) {
+                          acc.rateLimitResetTimes = {};
+                          acc.coolingDownUntil = undefined;
+                          acc.cooldownReason = undefined;
+                        }
+
                         storageUpdated = true;
                       }
                     }
