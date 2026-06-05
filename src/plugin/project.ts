@@ -306,10 +306,11 @@ export async function ensureProjectContext(auth: OAuthAuthDetails): Promise<Proj
       return { auth, effectiveProjectId: parts.projectId };
     }
 
-    // No project id present in auth — return empty so prepareAntigravityRequest()
-    // generates a unique synthetic project ID per request via generateSyntheticProjectId().
-    // This avoids all failed-onboarding accounts sharing one hardcoded project's quota pool.
-    return { auth, effectiveProjectId: "" };  };
+    // No project id present in auth. Do not invent a synthetic project ID: the
+    // Antigravity proxy rejects arbitrary project names with 403 Permission denied.
+    // Fall back to the known default project as a last-resort compatibility path.
+    return { auth, effectiveProjectId: fallbackProjectId };
+  };
 
   if (!cacheKey) {
     return resolveContext();

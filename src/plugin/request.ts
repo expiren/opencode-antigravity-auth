@@ -812,15 +812,6 @@ let _lastCacheStats: { model: string; read: number; total: number; hitRate: numb
 export function getLastCacheStats() {
   return _lastCacheStats;
 }
-function generateSyntheticProjectId(): string {
-  const adjectives = ["useful", "bright", "swift", "calm", "bold"];
-  const nouns = ["fuze", "wave", "spark", "flow", "core"];
-  const adj = adjectives[Math.floor(Math.random() * adjectives.length)];
-  const noun = nouns[Math.floor(Math.random() * nouns.length)];
-  const randomPart = crypto.randomUUID().slice(0, 5).toLowerCase();
-  return `${adj}-${noun}-${randomPart}`;
-}
-
 const STREAM_ACTION = "streamGenerateContent";
 
 /**
@@ -1568,7 +1559,7 @@ export function prepareAntigravityRequest(
 
         stripInjectedDebugFromRequestPayload(requestPayload);
         sanitizeRequestPayloadForAntigravity(requestPayload, isClaude);
-        const effectiveProjectId = projectId?.trim() || (headerStyle === "antigravity" ? generateSyntheticProjectId() : "");
+        const effectiveProjectId = projectId?.trim() || "";
         resolvedProjectId = effectiveProjectId;
 
         // System instruction injection removed — CLIProxyAPI v6.9.x no longer injects it
@@ -1957,7 +1948,6 @@ export const __testExports = {
   hasToolUseInMessages,
   ensureThinkingBeforeToolUseInContents,
   ensureThinkingBeforeToolUseInMessages,
-  generateSyntheticProjectId,
   MIN_SIGNATURE_LENGTH,
   transformSseLine,
   transformStreamingPayload,

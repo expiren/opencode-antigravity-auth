@@ -22,6 +22,7 @@ import {
   logResponseBody,
   logModelFamily,
   isDebugEnabled,
+  isDebugTuiEnabled,
   getLogFilePath,
   initializeDebug,
 } from "./plugin/debug";
@@ -1525,7 +1526,7 @@ export const createAntigravityPlugin = (providerId: string) => async (
           const model = extractModelFromUrl(urlString);
           const debugLines: string[] = [];
           const pushDebug = (line: string) => {
-            if (!isDebugEnabled()) return;
+            if (!isDebugEnabled() && !isDebugTuiEnabled()) return;
             debugLines.push(line);
           };
           pushDebug(`request=${urlString}`);

@@ -27,7 +27,6 @@ const {
   hasSignedThinkingInContents,
   hasToolUseInMessages,
   hasSignedThinkingInMessages,
-  generateSyntheticProjectId,
   MIN_SIGNATURE_LENGTH,
   transformStreamingPayload,
   createStreamingTransformer,
@@ -377,21 +376,6 @@ describe("request.ts", () => {
         { role: "assistant", content: [{ type: "thinking", thinking: "no sig" }] },
       ];
       expect(hasSignedThinkingInMessages(messages)).toBe(false);
-    });
-  });
-
-  describe("generateSyntheticProjectId", () => {
-    it("generates a string in expected format", () => {
-      const id = generateSyntheticProjectId();
-      expect(id).toMatch(/^[a-z]+-[a-z]+-[a-z0-9]{5}$/);
-    });
-
-    it("generates unique IDs on each call", () => {
-      const ids = new Set<string>();
-      for (let i = 0; i < 10; i++) {
-        ids.add(generateSyntheticProjectId());
-      }
-      expect(ids.size).toBe(10);
     });
   });
 
