@@ -1601,6 +1601,7 @@ export const createAntigravityPlugin = (providerId: string) => async (
           };
 
           let accountSwitchCount = 0;
+          let nullAccountLoopCount = 0;
           const maxAccountSwitches = config.max_account_switches ?? 10;
           let previousAccountIndex = -1;
           let needsCacheWarmup = false;
@@ -1656,6 +1657,16 @@ export const createAntigravityPlugin = (providerId: string) => async (
             }
             
             if (!account) {
+              nullAccountLoopCount++;
+              // Prevent infinite null-account wait loops - cap at maxAccountSwitches iterations
+              if (nullAccountLoopCount > maxAccountSwitches) {
+                pushDebug(`null-account-loop-cap: exceeded ${maxAccountSwitches} iterations without finding available account`);
+                throw new Error(
+                  `All ${accountCount} account(s) exhausted for ${family} after ${nullAccountLoopCount} retry iterations. ` +
+                  `Add more accounts with \`opencode auth login\` or wait for quota reset.`
+                );
+              }
+
               if (accountManager.areAllAccountsOverSoftQuota(family, config.soft_quota_threshold_percent, softQuotaCacheTtlMs, model)) {
                 const threshold = config.soft_quota_threshold_percent;
                 const softQuotaWaitMs = accountManager.getMinWaitTimeForSoftQuota(family, threshold, softQuotaCacheTtlMs, model);
