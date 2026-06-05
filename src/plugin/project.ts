@@ -180,13 +180,13 @@ export async function onboardManagedProject(
   attempts = 10,
   delayMs = 5000,
 ): Promise<string | undefined> {
-  const metadata = buildMetadata(projectId);
+  // Only send tierId — metadata causes onboarding failures on some endpoints.
+  // Matches the minimal body used by working onboarding scripts.
   const requestBody: Record<string, unknown> = {
     tierId,
-    metadata,
   };
-
-  for (const baseEndpoint of ANTIGRAVITY_ENDPOINT_FALLBACKS) {
+  // Use prod-first order for onboarding — daily sandbox often rejects non-dev accounts.
+  for (const baseEndpoint of ANTIGRAVITY_LOAD_ENDPOINTS) {
     for (let attempt = 0; attempt < attempts; attempt += 1) {
       try {
         const response = await fetch(
@@ -203,6 +203,11 @@ export async function onboardManagedProject(
         );
 
         if (!response.ok) {
+          log.debug("Onboard request failed", {
+            endpoint: baseEndpoint,
+            status: response.status,
+            statusText: response.statusText,
+          });
           break;
         }
 
@@ -222,7 +227,6 @@ export async function onboardManagedProject(
       await wait(delayMs);
     }
   }
-
   return undefined;
 }
 
@@ -280,7 +284,7 @@ export async function ensureProjectContext(auth: OAuthAuthDetails): Promise<Proj
 
     // No managed project found - try to auto-provision one via onboarding.
     // This handles accounts that were added before managed project provisioning was required.
-    const tierId = getDefaultTierId(loadPayload?.allowedTiers) ?? "FREE";
+    const tierId = getDefaultTierId(loadPayload?.allowedTiers) ?? "free-tier";
     log.debug("Auto-provisioning managed project", { tierId, projectId: parts.projectId });
     
     const provisionedProjectId = await onboardManagedProject(
@@ -302,9 +306,10 @@ export async function ensureProjectContext(auth: OAuthAuthDetails): Promise<Proj
       return { auth, effectiveProjectId: parts.projectId };
     }
 
-    // No project id present in auth; fall back to the hardcoded id for requests.
-    return { auth, effectiveProjectId: fallbackProjectId };
-  };
+    // No project id present in auth — return empty so prepareAntigravityRequest()
+    // generates a unique synthetic project ID per request via generateSyntheticProjectId().
+    // This avoids all failed-onboarding accounts sharing one hardcoded project's quota pool.
+    return { auth, effectiveProjectId: "" };  };
 
   if (!cacheKey) {
     return resolveContext();

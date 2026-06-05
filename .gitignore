@@ -45,3 +45,6 @@ CLIProxyAPI/
 LLM-API-Key-Proxy/
 opencode/
 opencode-better-antigravity-auth/
+
+# Magic Context historian XMLs (may contain secrets from conversation)
+.opencode/magic-context/historian/
