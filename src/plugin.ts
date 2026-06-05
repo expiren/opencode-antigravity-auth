@@ -2753,7 +2753,10 @@ export const createAntigravityPlugin = (providerId: string) => async (
                         (resetTime) => typeof resetTime === 'number' && resetTime > now
                       );
                       if (isRateLimited) {
-                        status = 'rate-limited';
+                        const hasQuotaCapacity = acc.cachedQuota && Object.values(acc.cachedQuota).some(
+                          (g) => typeof g.remainingFraction === "number" && g.remainingFraction > 0
+                        );
+                        status = hasQuotaCapacity ? 'active' : 'rate-limited';
                       } else {
                         status = 'active';
                       }
@@ -2762,7 +2765,12 @@ export const createAntigravityPlugin = (providerId: string) => async (
                     }
 
                     if (acc.coolingDownUntil && acc.coolingDownUntil > now) {
-                      status = 'rate-limited';
+                      const hasQuotaCapacity = acc.cachedQuota && Object.values(acc.cachedQuota).some(
+                        (g) => typeof g.remainingFraction === "number" && g.remainingFraction > 0
+                      );
+                      if (!hasQuotaCapacity) {
+                        status = 'rate-limited';
+                      }
                     }
                   }
 

@@ -136,6 +136,15 @@ export function loadConfig(directory: string): AntigravityConfig {
     config = mergeConfigs(config, projectConfig);
   }
 
+  log.info("Config loaded", {
+    strategy: config.account_selection_strategy,
+    scheduling: config.scheduling_mode,
+    maxSwitches: config.max_account_switches,
+    sentinel: config.claude_thinking_sentinel,
+    debug: config.debug,
+    debugTui: config.debug_tui,
+  });
+
   return config;
 }
 

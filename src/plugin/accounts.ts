@@ -227,6 +227,52 @@ function clearExpiredRateLimits(account: ManagedAccount): void {
       delete account.rateLimitResetTimes[key];
     }
   }
+  // Also clear rate limits that are contradicted by fresh quota data
+  clearQuotaContradictedRateLimits(account);
+}
+
+/**
+ * Clear rate-limit lockouts that are contradicted by cached quota data.
+ *
+ * After the v1.6.61 migration from shared project IDs to per-account
+ * project IDs, many accounts retained 7-day QUOTA_EXHAUSTED lockouts
+ * from the old shared `rising-fact-p41fc` pool. These lockouts have
+ * future timestamps (so `clearExpiredRateLimits` won't touch them)
+ * but are no longer accurate — the quota API confirms the accounts
+ * have remaining capacity under their own project IDs.
+ *
+ * This function checks each rate-limited quota key against the
+ * account's `cachedQuota` and clears the lockout if the quota data
+ * shows remaining capacity (remainingFraction > 0).
+ */
+function clearQuotaContradictedRateLimits(account: ManagedAccount): void {
+  if (!account.cachedQuota) return;
+
+  const keys = Object.keys(account.rateLimitResetTimes) as QuotaKey[];
+  if (keys.length === 0) return;
+
+  let cleared = false;
+  for (const key of keys) {
+    // QuotaKey format: "claude:antigravity", "gemini:antigravity", etc.
+    // Extract the quota group prefix to look up in cachedQuota
+    const group = key.split(":")[0] as QuotaGroup | undefined;
+    if (!group) continue;
+
+    const quotaData = account.cachedQuota[group];
+    if (quotaData && typeof quotaData.remainingFraction === "number" && quotaData.remainingFraction > 0) {
+      delete account.rateLimitResetTimes[key];
+      cleared = true;
+    }
+  }
+
+  if (cleared) {
+    // If all rate limits were cleared, also clear cooldown state
+    const remainingKeys = Object.keys(account.rateLimitResetTimes);
+    if (remainingKeys.length === 0) {
+      account.coolingDownUntil = undefined;
+      account.cooldownReason = undefined;
+    }
+  }
 }
 
 /**
