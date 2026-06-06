@@ -1064,7 +1064,6 @@ function formatWaitTime(ms: number): string {
 
 // Progressive rate limit retry delays
 const FIRST_RETRY_DELAY_MS = 1000;      // 1s - first 429 quick retry on same account
-const SWITCH_ACCOUNT_DELAY_MS = 5000;   // 5s - delay before switching to another account
 
 /**
  * Rate limit state tracking with time-window deduplication.
@@ -2307,9 +2306,10 @@ export const createAntigravityPlugin = (providerId: string) => async (
                       // Check if any other account has Antigravity quota for this model
                       if (hasOtherAccountWithAntigravity(account)) {
                         pushDebug(`antigravity exhausted on account ${account.index}, but available on others. Switching account.`);
-                        await showToast(`Rate limited again. Switching account in 5s...`, "warning");
-                        await sleep(SWITCH_ACCOUNT_DELAY_MS, abortSignal);
-                        shouldSwitchAccount = true;
+                        const switchDelayMs1 = config.switch_account_delay_ms ?? 500;
+                        const switchDelayFormatted1 = switchDelayMs1 >= 1000 ? `${Math.round(switchDelayMs1 / 1000)}s` : `${switchDelayMs1}ms`;
+                        await showToast(`Rate limited. Switching account in ${switchDelayFormatted1}...`, "warning");
+                        await sleep(switchDelayMs1, abortSignal);                        shouldSwitchAccount = true;
                         break;
                       }
 
@@ -2361,9 +2361,10 @@ export const createAntigravityPlugin = (providerId: string) => async (
                     const quotaMsg = bodyInfo.quotaResetTime 
                       ? ` (quota resets ${bodyInfo.quotaResetTime})`
                       : ``;
-                    await showToast(`Rate limited again. Switching account in 5s...${quotaMsg}`, "warning");
-                    await sleep(SWITCH_ACCOUNT_DELAY_MS, abortSignal);
-                  } else {
+                    const switchDelayMs2 = config.switch_account_delay_ms ?? 500;
+                    const switchDelayFormatted2 = switchDelayMs2 >= 1000 ? `${Math.round(switchDelayMs2 / 1000)}s` : `${switchDelayMs2}ms`;
+                    await showToast(`Rate limited. Switching account in ${switchDelayFormatted2}...${quotaMsg}`, "warning");
+                    await sleep(switchDelayMs2, abortSignal);                  } else {
                     // Single account: exponential backoff (1s, 2s, 4s, 8s... max 60s)
                     const expBackoffMs = Math.min(FIRST_RETRY_DELAY_MS * Math.pow(2, attempt - 1), 60000);
                     const expBackoffFormatted = expBackoffMs >= 1000 ? `${Math.round(expBackoffMs / 1000)}s` : `${expBackoffMs}ms`;

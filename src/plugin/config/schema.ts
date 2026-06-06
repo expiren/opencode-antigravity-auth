@@ -414,19 +414,30 @@ export const AntigravityConfigSchema = z.object({
     * @default 0
     */
    request_jitter_max_ms: z.number().min(0).max(5000).default(0),
+
+   /**
+    * Delay in milliseconds before switching to the next account after a rate limit.
+    * Lower values reduce total wait time when cycling through accounts.
+    * Higher values give the rate-limited account more time to recover.
+    * 
+    * With max_account_switches=10 and switch_account_delay_ms=500,
+    * worst case is 5s of sleeping vs 50s with the old 5000ms default.
+    * 
+    * @default 500
+    */
+   switch_account_delay_ms: z.number().min(0).max(10000).default(500),
    
    /**
     * Soft quota threshold percentage (1-100).
     * When an account's quota usage reaches this percentage, skip it during
     * account selection (same as if it were rate-limited).
     * 
-    * Example: 90 means skip account when 90% of quota is used (10% remaining).
+   * Example: 80 means skip account when 80% of quota is used (20% remaining).
     * Set to 100 to disable soft quota protection.
     * 
-    * @default 90
+    * @default 80
     */
-   soft_quota_threshold_percent: z.number().min(1).max(100).default(90),
-   
+   soft_quota_threshold_percent: z.number().min(1).max(100).default(80),   
    /**
     * How often to refresh quota data in the background (in minutes).
     * Quota is refreshed opportunistically after successful API requests.
@@ -555,7 +566,8 @@ export const DEFAULT_CONFIG: AntigravityConfig = {
   default_retry_after_seconds: 60,
   max_backoff_seconds: 60,
   request_jitter_max_ms: 0,
-  soft_quota_threshold_percent: 90,
+  switch_account_delay_ms: 500,
+  soft_quota_threshold_percent: 80,
   quota_refresh_interval_minutes: 30,
   soft_quota_cache_ttl_minutes: "auto",
   proactive_rotation_threshold_percent: 20,
