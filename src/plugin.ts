@@ -1705,7 +1705,16 @@ export const createAntigravityPlugin = (providerId: string) => async (
               config.pid_offset_enabled,
               config.soft_quota_threshold_percent,
               softQuotaCacheTtlMs,
+              isChildSession,
             );
+
+            if (account) {
+              const mainIdx = isChildSession ? accountManager.getMainAccountIndex(family) : -1;
+              pushDebug(
+                `[AccountSelect] idx=${account.index} family=${family} child=${isChildSession}` +
+                (isChildSession ? ` mainIdx=${mainIdx} isolated=${account.index !== mainIdx}` : ""),
+              );
+            }
 
             if (!account && allowQuotaFallback) {
               const alternateHeaderStyle: HeaderStyle =
@@ -1718,6 +1727,7 @@ export const createAntigravityPlugin = (providerId: string) => async (
                 config.pid_offset_enabled,
                 config.soft_quota_threshold_percent,
                 softQuotaCacheTtlMs,
+                isChildSession,
               );
               if (account) {
                 pushDebug(
@@ -2524,6 +2534,7 @@ export const createAntigravityPlugin = (providerId: string) => async (
                     model,
                     proactiveThreshold,
                     softQuotaCacheTtlMs,
+                    isChildSession,
                   )) {
                     const rotated = accountManager.proactivelyRotateForFamily(
                       family,
@@ -2531,6 +2542,7 @@ export const createAntigravityPlugin = (providerId: string) => async (
                       headerStyle,
                       config.soft_quota_threshold_percent,
                       softQuotaCacheTtlMs,
+                      isChildSession,
                     );
                     if (rotated) {
                       const remaining = account.cachedQuota?.[resolveQuotaGroup(family, model)]?.remainingFraction;

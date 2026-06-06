@@ -321,6 +321,11 @@ export class AccountManager {
   private sessionStartTime: number = Date.now()
   private sessionRequestCounts: Map<string, { claude: number, gemini: number }> = new Map()
   private sessionUsedAccounts: Set<number> = new Set()
+  private childAccountIndexByFamily: Record<ModelFamily, number> = {
+    claude: -1,
+    gemini: -1,
+  }
+  private childCursorByFamily: Record<ModelFamily, number> = { claude: 0, gemini: 0 }
   static async loadFromDisk(authFallback?: OAuthAuthDetails): Promise<AccountManager> {
     const stored = await loadAccounts();
     return new AccountManager(authFallback, stored);
@@ -462,6 +467,38 @@ export class AccountManager {
     }
   }
 
+  // --- Session-type dispatch helpers ---
+  // Child sessions (subagents) use separate account indices and cursors
+  // to prevent cache busting on the main session's warm cache bucket.
+
+  private getActiveIndex(family: ModelFamily, isChildSession: boolean): number {
+    return isChildSession
+      ? this.childAccountIndexByFamily[family]
+      : this.currentAccountIndexByFamily[family]
+  }
+
+  private setActiveIndex(family: ModelFamily, index: number, isChildSession: boolean): void {
+    if (isChildSession) {
+      this.childAccountIndexByFamily[family] = index
+    } else {
+      this.currentAccountIndexByFamily[family] = index
+    }
+  }
+
+  private getCursor(family: ModelFamily, isChildSession: boolean): number {
+    return isChildSession
+      ? this.childCursorByFamily[family]
+      : this.cursorByFamily[family]
+  }
+
+  private advanceCursor(family: ModelFamily, isChildSession: boolean): void {
+    if (isChildSession) {
+      this.childCursorByFamily[family]++
+    } else {
+      this.cursorByFamily[family]++
+    }
+  }
+
   getAccountCount(): number {
     return this.getEnabledAccounts().length;
   }
@@ -478,8 +515,8 @@ export class AccountManager {
     return this.accounts.map((a) => ({ ...a, parts: { ...a.parts }, rateLimitResetTimes: { ...a.rateLimitResetTimes } }));
   }
 
-  getCurrentAccountForFamily(family: ModelFamily): ManagedAccount | null {
-    const currentIndex = this.currentAccountIndexByFamily[family];
+  getCurrentAccountForFamily(family: ModelFamily, isChildSession: boolean = false): ManagedAccount | null {
+    const currentIndex = this.getActiveIndex(family, isChildSession);
     if (currentIndex >= 0 && currentIndex < this.accounts.length) {
       const account = this.accounts[currentIndex] ?? null;
       // Only return account if it's enabled - disabled accounts should not be selected
@@ -490,9 +527,17 @@ export class AccountManager {
     return null;
   }
 
-  markSwitched(account: ManagedAccount, reason: "rate-limit" | "initial" | "rotation", family: ModelFamily): void {
+  /**
+   * Get the main session's current account index for a family.
+   * Used by child sessions to know which account to avoid.
+   */
+  getMainAccountIndex(family: ModelFamily): number {
+    return this.currentAccountIndexByFamily[family];
+  }
+
+  markSwitched(account: ManagedAccount, reason: "rate-limit" | "initial" | "rotation", family: ModelFamily, isChildSession: boolean = false): void {
     account.lastSwitchReason = reason;
-    this.currentAccountIndexByFamily[family] = account.index;
+    this.setActiveIndex(family, account.index, isChildSession);
   }
 
   /**
@@ -520,14 +565,15 @@ export class AccountManager {
     pidOffsetEnabled: boolean = false,
     softQuotaThresholdPercent: number = 100,
     softQuotaCacheTtlMs: number = 10 * 60 * 1000,
+    isChildSession: boolean = false,
   ): ManagedAccount | null {
     const quotaKey = getQuotaKey(family, headerStyle, model);
 
     if (strategy === 'round-robin') {
-      const next = this.getNextForFamily(family, model, headerStyle, softQuotaThresholdPercent, softQuotaCacheTtlMs);
+      const next = this.getNextForFamily(family, model, headerStyle, softQuotaThresholdPercent, softQuotaCacheTtlMs, isChildSession);
       if (next) {
         this.markTouchedForQuota(next, quotaKey);
-        this.currentAccountIndexByFamily[family] = next.index;
+        this.setActiveIndex(family, next.index, isChildSession);
       }
       return next;
     }
@@ -535,9 +581,11 @@ export class AccountManager {
     if (strategy === 'hybrid') {
       const healthTracker = getHealthTracker();
       const tokenTracker = getTokenTracker();
+
+      const mainAccountIndex = isChildSession ? this.getMainAccountIndex(family) : -1;
       
       const accountsWithMetrics: AccountWithMetrics[] = this.accounts
-        .filter(acc => acc.enabled !== false)
+        .filter(acc => acc.enabled !== false && acc.index !== mainAccountIndex)
         .map(acc => {
           clearExpiredRateLimits(acc);
           return {
@@ -550,8 +598,7 @@ export class AccountManager {
           };
         });
 
-      // Get current account index for stickiness
-      const currentIndex = this.currentAccountIndexByFamily[family] ?? null;
+      const currentIndex = this.getActiveIndex(family, isChildSession) ?? null;
       
       const selectedIndex = selectHybridAccount(accountsWithMetrics, tokenTracker, currentIndex);
       if (selectedIndex !== null) {
@@ -559,7 +606,7 @@ export class AccountManager {
         if (selected) {
           selected.lastUsed = nowMs();
           this.markTouchedForQuota(selected, quotaKey);
-          this.currentAccountIndexByFamily[family] = selected.index;
+          this.setActiveIndex(family, selected.index, isChildSession);
           return selected;
         }
       }
@@ -570,16 +617,16 @@ export class AccountManager {
     // Different sessions (PIDs) will prefer different starting accounts
     if (pidOffsetEnabled && !this.sessionOffsetApplied[family] && this.accounts.length > 1) {
       const pidOffset = process.pid % this.accounts.length;
-      const baseIndex = this.currentAccountIndexByFamily[family] ?? 0;
+      const baseIndex = this.getActiveIndex(family, isChildSession) ?? 0;
       const newIndex = (baseIndex + pidOffset) % this.accounts.length;
       
       debugLogToFile(`[Account] Applying PID offset: pid=${process.pid} offset=${pidOffset} family=${family} index=${baseIndex}->${newIndex}`);
       
-      this.currentAccountIndexByFamily[family] = newIndex;
+      this.setActiveIndex(family, newIndex, isChildSession);
       this.sessionOffsetApplied[family] = true;
     }
 
-    const current = this.getCurrentAccountForFamily(family);
+    const current = this.getCurrentAccountForFamily(family, isChildSession);
     if (current) {
       clearExpiredRateLimits(current);
       const isLimitedForRequestedStyle = isRateLimitedForHeaderStyle(current, family, headerStyle, model);
@@ -590,18 +637,20 @@ export class AccountManager {
       }
     }
 
-    const next = this.getNextForFamily(family, model, headerStyle, softQuotaThresholdPercent, softQuotaCacheTtlMs);
+    const next = this.getNextForFamily(family, model, headerStyle, softQuotaThresholdPercent, softQuotaCacheTtlMs, isChildSession);
     if (next) {
       this.markTouchedForQuota(next, quotaKey);
-      this.currentAccountIndexByFamily[family] = next.index;
+      this.setActiveIndex(family, next.index, isChildSession);
     }
     return next;
   }
 
-  getNextForFamily(family: ModelFamily, model?: string | null, headerStyle: HeaderStyle = "antigravity", softQuotaThresholdPercent: number = 100, softQuotaCacheTtlMs: number = 10 * 60 * 1000): ManagedAccount | null {
+  getNextForFamily(family: ModelFamily, model?: string | null, headerStyle: HeaderStyle = "antigravity", softQuotaThresholdPercent: number = 100, softQuotaCacheTtlMs: number = 10 * 60 * 1000, isChildSession: boolean = false): ManagedAccount | null {
+    const mainAccountIndex = isChildSession ? this.getMainAccountIndex(family) : -1;
     const available = this.accounts.filter((a) => {
       clearExpiredRateLimits(a);
       return a.enabled !== false && 
+             a.index !== mainAccountIndex &&
              !isRateLimitedForHeaderStyle(a, family, headerStyle, model) && 
              !isOverSoftQuotaThreshold(a, family, softQuotaThresholdPercent, softQuotaCacheTtlMs, model) &&
              !this.isAccountCoolingDown(a);
@@ -614,13 +663,13 @@ export class AccountManager {
     const sessionUsed = available.filter(a => this.sessionUsedAccounts.has(a.index));
     const candidates = sessionUsed.length > 0 ? sessionUsed : available;
 
-    const cursor = this.cursorByFamily[family];
+    const cursor = this.getCursor(family, isChildSession);
     const account = candidates[cursor % candidates.length];
     if (!account) {
       return null;
     }
 
-    this.cursorByFamily[family] = cursor + 1;
+    this.advanceCursor(family, isChildSession);
     return account;
   }
   markRateLimited(
@@ -659,10 +708,11 @@ export class AccountManager {
     model: string | null | undefined,
     thresholdPercent: number,
     cacheTtlMs: number,
+    isChildSession: boolean = false,
   ): boolean {
     if (thresholdPercent <= 0) return false;
 
-    const current = this.getCurrentAccountForFamily(family);
+    const current = this.getCurrentAccountForFamily(family, isChildSession);
     if (!current || !current.cachedQuota || current.cachedQuotaUpdatedAt == null) return false;
 
     const age = nowMs() - current.cachedQuotaUpdatedAt;
@@ -682,12 +732,15 @@ export class AccountManager {
     headerStyle: HeaderStyle,
     softQuotaThresholdPercent: number,
     softQuotaCacheTtlMs: number,
+    isChildSession: boolean = false,
   ): ManagedAccount | null {
-    const currentIndex = this.currentAccountIndexByFamily[family];
+    const currentIndex = this.getActiveIndex(family, isChildSession);
+    const mainAccountIndex = isChildSession ? this.getMainAccountIndex(family) : -1;
 
     const candidates = this.accounts.filter(acc => {
       if (acc.enabled === false) return false;
       if (acc.index === currentIndex) return false;
+      if (acc.index === mainAccountIndex) return false;
       clearExpiredRateLimits(acc);
       if (isRateLimitedForHeaderStyle(acc, family, headerStyle, model)) return false;
       if (isOverSoftQuotaThreshold(acc, family, softQuotaThresholdPercent, softQuotaCacheTtlMs, model)) return false;
@@ -712,7 +765,7 @@ export class AccountManager {
 
     const quotaKey = getQuotaKey(family, headerStyle, model);
     this.markTouchedForQuota(selected, quotaKey);
-    this.currentAccountIndexByFamily[family] = selected.index;
+    this.setActiveIndex(family, selected.index, isChildSession);
 
     return selected;
   }
@@ -896,6 +949,10 @@ export class AccountManager {
           const next = this.accounts.find((a, i) => i !== accountIndex && a.enabled !== false);
           this.currentAccountIndexByFamily[family] = next?.index ?? -1;
         }
+        if (this.childAccountIndexByFamily[family] === accountIndex) {
+          const next = this.accounts.find((a, i) => i !== accountIndex && a.enabled !== false);
+          this.childAccountIndexByFamily[family] = next?.index ?? -1;
+        }
       }
     }
 
@@ -978,8 +1035,11 @@ export class AccountManager {
 
     if (this.accounts.length === 0) {
       this.cursorByFamily = { claude: 0, gemini: 0 };
+      this.childCursorByFamily = { claude: 0, gemini: 0 };
       this.currentAccountIndexByFamily.claude = -1;
       this.currentAccountIndexByFamily.gemini = -1;
+      this.childAccountIndexByFamily.claude = -1;
+      this.childAccountIndexByFamily.gemini = -1;
       return true;
     }
 
@@ -989,11 +1049,23 @@ export class AccountManager {
       }
       this.cursorByFamily[family] = this.cursorByFamily[family] % this.accounts.length;
 
+      if (this.childCursorByFamily[family] > idx) {
+        this.childCursorByFamily[family] -= 1;
+      }
+      this.childCursorByFamily[family] = this.childCursorByFamily[family] % this.accounts.length;
+
       if (this.currentAccountIndexByFamily[family] > idx) {
         this.currentAccountIndexByFamily[family] -= 1;
       }
       if (this.currentAccountIndexByFamily[family] >= this.accounts.length) {
         this.currentAccountIndexByFamily[family] = -1;
+      }
+
+      if (this.childAccountIndexByFamily[family] > idx) {
+        this.childAccountIndexByFamily[family] -= 1;
+      }
+      if (this.childAccountIndexByFamily[family] >= this.accounts.length) {
+        this.childAccountIndexByFamily[family] = -1;
       }
     }
 
