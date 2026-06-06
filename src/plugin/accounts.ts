@@ -320,7 +320,8 @@ export class AccountManager {
 
   private sessionStartTime: number = Date.now()
   private sessionRequestCounts: Map<string, { claude: number, gemini: number }> = new Map()
-  private sessionUsedAccounts: Set<number> = new Set()
+  private mainSessionUsedAccounts: Set<number> = new Set()
+  private childSessionUsedAccounts: Set<number> = new Set()
   private childAccountIndexByFamily: Record<ModelFamily, number> = {
     claude: -1,
     gemini: -1,
@@ -660,7 +661,8 @@ export class AccountManager {
       return null;
     }
 
-    const sessionUsed = available.filter(a => this.sessionUsedAccounts.has(a.index));
+    const usedSet = isChildSession ? this.childSessionUsedAccounts : this.mainSessionUsedAccounts;
+    const sessionUsed = available.filter(a => usedSet.has(a.index));
     const candidates = sessionUsed.length > 0 ? sessionUsed : available;
 
     const cursor = this.getCursor(family, isChildSession);
@@ -695,12 +697,19 @@ export class AccountManager {
     }
   }
 
-  recordSessionUsage(accountIndex: number): void {
-    this.sessionUsedAccounts.add(accountIndex);
+  recordSessionUsage(accountIndex: number, isChildSession: boolean = false): void {
+    if (isChildSession) {
+      this.childSessionUsedAccounts.add(accountIndex);
+    } else {
+      this.mainSessionUsedAccounts.add(accountIndex);
+    }
   }
 
-  wasUsedInSession(accountIndex: number): boolean {
-    return this.sessionUsedAccounts.has(accountIndex);
+  wasUsedInSession(accountIndex: number, isChildSession: boolean = false): boolean {
+    if (isChildSession) {
+      return this.childSessionUsedAccounts.has(accountIndex);
+    }
+    return this.mainSessionUsedAccounts.has(accountIndex);
   }
 
   shouldProactivelyRotate(
@@ -750,7 +759,8 @@ export class AccountManager {
 
     if (candidates.length === 0) return null;
 
-    const warmCandidates = candidates.filter(a => this.sessionUsedAccounts.has(a.index));
+    const usedSet = isChildSession ? this.childSessionUsedAccounts : this.mainSessionUsedAccounts;
+    const warmCandidates = candidates.filter(a => usedSet.has(a.index));
     const pool = warmCandidates.length > 0 ? warmCandidates : candidates;
 
     const quotaGroup = resolveQuotaGroup(family, model);

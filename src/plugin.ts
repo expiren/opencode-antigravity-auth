@@ -77,10 +77,13 @@ function getCapacityBackoffDelay(consecutiveFailures: number): number {
 const warmupAttemptedSessionIds = new Set<string>();
 const warmupSucceededSessionIds = new Set<string>();
 
-// Track if this plugin instance is running in a child session (subagent, background task)
-// Used to filter toasts based on toast_scope config
-let isChildSession = false;
-let childSessionParentID: string | undefined = undefined;
+// Track active child session IDs for proper lifecycle management
+// isChildSession is derived from this set — true when any child session is active
+// Solves the race condition where a single boolean stays true after child finishes
+const activeChildSessionIds = new Set<string>();
+function getIsChildSession(): boolean {
+  return activeChildSessionIds.size > 0;
+}
 
 const log = createLogger("plugin");
 
@@ -1370,18 +1373,35 @@ export const createAntigravityPlugin = (providerId: string) => async (
         })
       }
 
-      const props = input.event.properties as { info?: { parentID?: string } } | undefined;      if (props?.info?.parentID) {
-        isChildSession = true;
-        childSessionParentID = props.info.parentID;
-        log.debug("child-session-detected", { parentID: props.info.parentID });
+      const props = input.event.properties as Record<string, unknown> | undefined;
+      // Log all event properties to discover available session identity fields
+      log.debug("session-created-properties", {
+        keys: props ? Object.keys(props) : [],
+        info: props?.info,
+        sessionID: props?.sessionID,
+        session_id: props?.session_id,
+        id: props?.id,
+      });
+
+      const info = (props?.info ?? {}) as { id?: string; parentID?: string };
+      if (info.parentID && info.id) {
+        activeChildSessionIds.add(info.id);
+        log.debug("child-session-started", { sessionId: info.id, parentID: info.parentID, activeChildren: activeChildSessionIds.size });
       } else {
-        // Reset for root sessions - important when plugin instance is reused
-        isChildSession = false;
-        childSessionParentID = undefined;
-        log.debug("root-session-detected", {});
+        activeChildSessionIds.clear();
+        log.debug("root-session-detected", { activeChildren: 0 });
       }
     }
     
+    if (input.event.type === "session.deleted") {
+      const props = input.event.properties as Record<string, unknown> | undefined;
+      const info = (props?.info ?? {}) as { id?: string; parentID?: string };
+      if (info.parentID && info.id) {
+        activeChildSessionIds.delete(info.id);
+        log.debug("child-session-ended", { sessionId: info.id, activeChildren: activeChildSessionIds.size });
+      }
+    }
+
     // Handle session recovery
     if (sessionRecovery && input.event.type === "session.error") {
       const props = input.event.properties as Record<string, unknown> | undefined;
@@ -1412,8 +1432,8 @@ export const createAntigravityPlugin = (providerId: string) => async (
           
           // Show success toast (respects toast_scope for child sessions)
           const successToast = getRecoverySuccessToast();
-          log.debug("recovery-toast", { ...successToast, isChildSession, toastScope: config.toast_scope });
-          if (!(config.toast_scope === "root_only" && isChildSession)) {
+          log.debug("recovery-toast", { ...successToast, isChildSession: getIsChildSession(), toastScope: config.toast_scope });
+          if (!(config.toast_scope === "root_only" && getIsChildSession())) {
             await client.tui.showToast({
               body: {
                 title: successToast.title,
@@ -1638,15 +1658,14 @@ export const createAntigravityPlugin = (providerId: string) => async (
           // Helper to show toast without blocking on abort (respects quiet_mode and toast_scope)
           const showToast = async (message: string, variant: "info" | "warning" | "success" | "error") => {
             // Always log to debug regardless of toast filtering
-            log.debug("toast", { message, variant, isChildSession, toastScope });
+            log.debug("toast", { message, variant, isChildSession: getIsChildSession(), toastScope });
             
             if (quietMode) return;
             if (abortSignal?.aborted) return;
             
             // Filter toasts for child sessions when toast_scope is "root_only"
-            if (toastScope === "root_only" && isChildSession) {
-              log.debug("toast-suppressed-child-session", { message, variant, parentID: childSessionParentID });
-              return;
+if (toastScope === "root_only" && getIsChildSession()) {
+              log.debug("toast-suppressed-child-session", { message, variant, activeChildren: activeChildSessionIds.size });              return;
             }
             
             if (variant === "warning" && message.toLowerCase().includes("rate")) {
@@ -1705,14 +1724,15 @@ export const createAntigravityPlugin = (providerId: string) => async (
               config.pid_offset_enabled,
               config.soft_quota_threshold_percent,
               softQuotaCacheTtlMs,
-              isChildSession,
+              getIsChildSession(),
             );
 
             if (account) {
-              const mainIdx = isChildSession ? accountManager.getMainAccountIndex(family) : -1;
+              const childSession = getIsChildSession();
+              const mainIdx = childSession ? accountManager.getMainAccountIndex(family) : -1;
               pushDebug(
-                `[AccountSelect] idx=${account.index} family=${family} child=${isChildSession}` +
-                (isChildSession ? ` mainIdx=${mainIdx} isolated=${account.index !== mainIdx}` : ""),
+                `[AccountSelect] idx=${account.index} family=${family} child=${childSession}` +
+                (childSession ? ` mainIdx=${mainIdx} isolated=${account.index !== mainIdx}` : ""),
               );
             }
 
@@ -1727,7 +1747,7 @@ export const createAntigravityPlugin = (providerId: string) => async (
                 config.pid_offset_enabled,
                 config.soft_quota_threshold_percent,
                 softQuotaCacheTtlMs,
-                isChildSession,
+                getIsChildSession(),
               );
               if (account) {
                 pushDebug(
@@ -1837,7 +1857,7 @@ export const createAntigravityPlugin = (providerId: string) => async (
               pushDebug(`account-switch: ${previousAccountIndex} → ${account.index}, warmup=${needsCacheWarmup}`);
             }
             previousAccountIndex = account.index;
-            accountManager.recordSessionUsage(account.index);
+            accountManager.recordSessionUsage(account.index, getIsChildSession());
             if (isDebugEnabled()) {
               logAccountContext("Selected", {
                 index: account.index,
@@ -2534,21 +2554,22 @@ export const createAntigravityPlugin = (providerId: string) => async (
                     model,
                     proactiveThreshold,
                     softQuotaCacheTtlMs,
-                    isChildSession,
+                    getIsChildSession(),
                   )) {
+                    const childSession = getIsChildSession();
                     const rotated = accountManager.proactivelyRotateForFamily(
                       family,
                       model,
                       headerStyle,
                       config.soft_quota_threshold_percent,
                       softQuotaCacheTtlMs,
-                      isChildSession,
+                      childSession,
                     );
                     if (rotated) {
                       const remaining = account.cachedQuota?.[resolveQuotaGroup(family, model)]?.remainingFraction;
                       const remainingPct = remaining != null ? `${(remaining * 100).toFixed(1)}%` : "?";
                       pushDebug(`[ProactiveRotation] account ${account.index} quota ${remainingPct} < ${proactiveThreshold}%, pre-switched to account ${rotated.index} for next request`);
-                      pushDebug(`[ProactiveRotation] ${account.index} → ${rotated.index} (warm=${accountManager.wasUsedInSession(rotated.index)})`);
+                      pushDebug(`[ProactiveRotation] ${account.index} → ${rotated.index} (warm=${accountManager.wasUsedInSession(rotated.index, childSession)})`);
                     }
                   }
                 }                logAntigravityDebugResponse(debugContext, response, {
