@@ -25,6 +25,7 @@ import {
   isDebugTuiEnabled,
   getLogFilePath,
   initializeDebug,
+  debugLogToFile,
 } from "./plugin/debug";
 import {
   buildThinkingWarmupBody,
@@ -168,6 +169,76 @@ async function triggerAsyncQuotaRefreshForAccount(
     log.debug(`quota-refresh-failed email=${accountKey}`, { error: String(err) });
   } finally {
     quotaRefreshInProgressByEmail.delete(accountKey);
+  }
+}
+
+let fleetRefreshInProgress = false;
+let lastFleetRefreshTime = 0;
+
+async function triggerFleetQuotaRefresh(
+  accountManager: AccountManager,
+  client: PluginClient,
+  providerId: string,
+  intervalMinutes: number,
+): Promise<void> {
+  if (intervalMinutes <= 0) return;
+  if (fleetRefreshInProgress) return;
+
+  const intervalMs = intervalMinutes * 60 * 1000;
+  const now = Date.now();
+  if (now - lastFleetRefreshTime < intervalMs) return;
+
+  const staleIndices = accountManager.getStaleOrLockedAccountIndices(intervalMs);
+  if (staleIndices.length === 0) return;
+
+  fleetRefreshInProgress = true;
+  lastFleetRefreshTime = now;
+
+  try {
+    const allAccountsForCheck = accountManager.getAccountsForQuotaCheck();
+    const BATCH_SIZE = 10;
+
+    for (let i = 0; i < staleIndices.length; i += BATCH_SIZE) {
+      const batchIndices = staleIndices.slice(i, i + BATCH_SIZE);
+      const batchAccounts = batchIndices
+        .map(idx => {
+          const acc = allAccountsForCheck[idx];
+          return acc ? { ...acc, _originalIndex: idx } : null;
+        })
+        .filter((a): a is NonNullable<typeof a> => a !== null);
+
+      if (batchAccounts.length === 0) continue;
+
+      const results = await checkAccountsQuota(
+        batchAccounts.map(({ _originalIndex, ...acc }) => acc),
+        client,
+        providerId,
+      );
+
+      for (let j = 0; j < results.length; j++) {
+        const res = results[j];
+        const originalIndex = batchAccounts[j]?._originalIndex;
+        if (res == null || originalIndex == null) continue;
+
+        if (res.status === "ok" && res.quota?.groups) {
+          accountManager.updateQuotaCache(originalIndex, res.quota.groups);
+
+          const hasCapacity = Object.values(res.quota.groups).some(
+            (g) => typeof g.remainingFraction === "number" && g.remainingFraction > 0
+          );
+          if (hasCapacity) {
+            accountManager.clearRateLimitsForAccount(originalIndex);
+          }
+        }
+      }
+    }
+
+    accountManager.requestSaveToDisk();
+    debugLogToFile(`[FleetQuota] Refreshed ${staleIndices.length} accounts`);
+  } catch (err) {
+    debugLogToFile(`[FleetQuota] Error: ${String(err)}`);
+  } finally {
+    fleetRefreshInProgress = false;
   }
 }
 
@@ -2438,6 +2509,13 @@ export const createAntigravityPlugin = (providerId: string) => async (
                     config.quota_refresh_interval_minutes,
                   );
 
+                  void triggerFleetQuotaRefresh(
+                    accountManager,
+                    client,
+                    providerId,
+                    config.quota_refresh_interval_minutes,
+                  );
+
                   // Proactive rotation: if current account quota is low, pre-switch
                   // to a warm-cache account so the NEXT request avoids a cold cache miss
                   const proactiveThreshold = config.proactive_rotation_threshold_percent ?? 20;
@@ -2943,6 +3021,15 @@ export const createAntigravityPlugin = (providerId: string) => async (
                           acc.rateLimitResetTimes = {};
                           acc.coolingDownUntil = undefined;
                           acc.cooldownReason = undefined;
+                        }
+
+                        // Sync to in-memory AccountManager so runtime selection
+                        // immediately sees fresh quota data without restart
+                        if (activeAccountManager) {
+                          activeAccountManager.updateQuotaCache(res.index, res.quota.groups);
+                          if (hasAnyQuota) {
+                            activeAccountManager.clearRateLimitsForAccount(res.index);
+                          }
                         }
 
                         storageUpdated = true;

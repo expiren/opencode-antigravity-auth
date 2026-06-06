@@ -1243,6 +1243,38 @@ export class AccountManager {
   }
 
   /**
+   * Clear all rate-limit lockouts for a single account.
+   * Used when quota API confirms remaining capacity, contradicting
+   * the persisted lockout timestamps.
+   */
+  clearRateLimitsForAccount(accountIndex: number): void {
+    const account = this.accounts[accountIndex];
+    if (!account) return;
+    account.rateLimitResetTimes = {};
+    account.coolingDownUntil = undefined;
+    account.cooldownReason = undefined;
+  }
+
+  /**
+   * Get accounts that are currently rate-limited or have stale/null
+   * quota data (candidates for fleet-level quota refresh).
+   * Returns indices of accounts that would benefit from a quota check.
+   */
+  getStaleOrLockedAccountIndices(maxAgMs: number): number[] {
+    const now = nowMs();
+    const indices: number[] = [];
+    for (const account of this.accounts) {
+      if (account.enabled === false) continue;
+      const hasRateLimits = Object.keys(account.rateLimitResetTimes).length > 0;
+      const isStale = account.cachedQuotaUpdatedAt == null || (now - account.cachedQuotaUpdatedAt) > maxAgMs;
+      if (hasRateLimits || isStale) {
+        indices.push(account.index);
+      }
+    }
+    return indices;
+  }
+
+  /**
    * Record a successful API request for an account.
    * Tracks per model family with daily reset.
    */
