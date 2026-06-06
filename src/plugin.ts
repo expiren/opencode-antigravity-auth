@@ -2773,6 +2773,16 @@ export const createAntigravityPlugin = (providerId: string) => async (
                         status = 'rate-limited';
                       }
                     }
+
+                    if (status === 'active' && acc.cachedQuota) {
+                      const groups = Object.values(acc.cachedQuota);
+                      const allExhausted = groups.length > 0 && groups.every(
+                        (g) => typeof g.remainingFraction === "number" && g.remainingFraction <= 0
+                      );
+                      if (allExhausted) {
+                        status = 'rate-limited';
+                      }
+                    }
                   }
 
                   const cooldownMs = (acc.coolingDownUntil && acc.coolingDownUntil > now)
