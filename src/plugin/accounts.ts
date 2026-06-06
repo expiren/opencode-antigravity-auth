@@ -248,6 +248,15 @@ function clearExpiredRateLimits(account: ManagedAccount): void {
 function clearQuotaContradictedRateLimits(account: ManagedAccount): void {
   if (!account.cachedQuota) return;
 
+  // Only use quota data to override rate limits if it was refreshed recently.
+  // Stale quota data (older than 2 minutes) must not override fresh 429 responses —
+  // otherwise the retry loop clears its own just-set rate limits and reselects
+  // the same account in an infinite loop.
+  const QUOTA_FRESHNESS_MS = 2 * 60 * 1000;
+  if (!account.cachedQuotaUpdatedAt || (nowMs() - account.cachedQuotaUpdatedAt) > QUOTA_FRESHNESS_MS) {
+    return;
+  }
+
   const keys = Object.keys(account.rateLimitResetTimes) as QuotaKey[];
   if (keys.length === 0) return;
 
