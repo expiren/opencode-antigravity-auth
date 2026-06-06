@@ -302,7 +302,7 @@ export function computeSoftQuotaCacheTtlMs(
  */
 export class AccountManager {
   private accounts: ManagedAccount[] = [];
-  private cursor = 0;
+  private cursorByFamily: Record<ModelFamily, number> = { claude: 0, gemini: 0 };
   private currentAccountIndexByFamily: Record<ModelFamily, number> = {
     claude: -1,
     gemini: -1,
@@ -331,7 +331,7 @@ export class AccountManager {
 
     if (stored && stored.accounts.length === 0) {
       this.accounts = [];
-      this.cursor = 0;
+      this.cursorByFamily = { claude: 0, gemini: 0 };
       return;
     }
 
@@ -389,10 +389,9 @@ export class AccountManager {
         }
       }
 
-      this.cursor = clampNonNegativeInt(stored.activeIndex, 0);
+      const legacyCursor = clampNonNegativeInt(stored.activeIndex, 0);
       if (this.accounts.length > 0) {
-        this.cursor = this.cursor % this.accounts.length;
-        const defaultIndex = this.cursor;
+        const defaultIndex = legacyCursor % this.accounts.length;
         this.currentAccountIndexByFamily.claude = clampNonNegativeInt(
           stored.activeIndexByFamily?.claude,
           defaultIndex
@@ -401,6 +400,11 @@ export class AccountManager {
           stored.activeIndexByFamily?.gemini,
           defaultIndex
         ) % this.accounts.length;
+
+        // Seed per-family cursors from stored indices so round-robin
+        // resumes where each family left off rather than resetting to 0.
+        this.cursorByFamily.claude = this.currentAccountIndexByFamily.claude;
+        this.cursorByFamily.gemini = this.currentAccountIndexByFamily.gemini;
       }
 
       // Persist updated fingerprint versions to disk
@@ -451,7 +455,7 @@ export class AccountManager {
             touchedForQuota: {},
           },
         ];
-        this.cursor = 0;
+        this.cursorByFamily = { claude: 0, gemini: 0 };
         this.currentAccountIndexByFamily.claude = 0;
         this.currentAccountIndexByFamily.gemini = 0;
       }
@@ -610,12 +614,13 @@ export class AccountManager {
     const sessionUsed = available.filter(a => this.sessionUsedAccounts.has(a.index));
     const candidates = sessionUsed.length > 0 ? sessionUsed : available;
 
-    const account = candidates[this.cursor % candidates.length];
+    const cursor = this.cursorByFamily[family];
+    const account = candidates[cursor % candidates.length];
     if (!account) {
       return null;
     }
 
-    this.cursor++;
+    this.cursorByFamily[family] = cursor + 1;
     return account;
   }
   markRateLimited(
@@ -972,18 +977,18 @@ export class AccountManager {
     });
 
     if (this.accounts.length === 0) {
-      this.cursor = 0;
+      this.cursorByFamily = { claude: 0, gemini: 0 };
       this.currentAccountIndexByFamily.claude = -1;
       this.currentAccountIndexByFamily.gemini = -1;
       return true;
     }
 
-    if (this.cursor > idx) {
-      this.cursor -= 1;
-    }
-    this.cursor = this.cursor % this.accounts.length;
-
     for (const family of ["claude", "gemini"] as ModelFamily[]) {
+      if (this.cursorByFamily[family] > idx) {
+        this.cursorByFamily[family] -= 1;
+      }
+      this.cursorByFamily[family] = this.cursorByFamily[family] % this.accounts.length;
+
       if (this.currentAccountIndexByFamily[family] > idx) {
         this.currentAccountIndexByFamily[family] -= 1;
       }

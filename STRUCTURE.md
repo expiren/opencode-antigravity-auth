@@ -75,12 +75,28 @@ opencode-antigravity-auth/
 │           ├── model-status.ts   # Per-model status aggregation across accounts
 │           ├── quota-status.ts   # Quota status labels, stale cache fail-open logic, and ANSI badge formatting
 │           └── select.ts         # Arrow-key selection list
-├── docs/                         # Additional documentation
-│   ├── ARCHITECTURE.md           # Detailed architecture (this repo also has root ARCHITECTURE.md)
-│   └── ANTIGRAVITY_API_SPEC.md   # Antigravity API wire-format reference
-├── scripts/                      # Build/release helper scripts
-├── script/                       # Additional utility scripts
+├── docs/                         # Supplementary documentation
+│   ├── ANTIGRAVITY_API_SPEC.md   # Antigravity API wire-format reference
+│   ├── ARCHITECTURE.md           # Detailed architecture (root also has ARCHITECTURE.md)
+│   ├── CONFIGURATION.md          # Configuration reference: env vars, JSON options, defaults
+│   ├── MODEL-VARIANTS.md         # Model variant syntax and header-style selection
+│   ├── MULTI-ACCOUNT.md          # Multi-account setup, rotation strategies, quota management
+│   └── TROUBLESHOOTING.md        # Common issues, error codes, and resolution steps
+├── scripts/                      # PI/Raspberry Pi setup scripts and quota-check utilities
+│   ├── auth-pi-tools.sh          # Auth helper for Pi environments
+│   ├── check-quota.mjs           # Quota check CLI utility
+│   ├── setup-opencode-pi.sh      # Pi install & setup
+│   ├── setup-pi-runner.sh        # Pi continuous-runner setup
+│   └── README-PI.md              # Pi deployment documentation
+├── script/                       # Build, E2E test, and schema-generation scripts
+│   ├── build-schema.ts           # JSON schema generation from Zod
+│   ├── test-cross-model.ts       # Cross-model compatibility E2E test
+│   ├── test-cross-model-e2e.sh   # Cross-model E2E shell runner
+│   ├── test-gemini-cli-e2e.sh    # Gemini CLI E2E shell runner
+│   ├── test-models.ts            # Model availability E2E test
+│   └── test-regression.ts        # Full regression E2E suite
 ├── assets/                       # Static assets
+│   └── antigravity.schema.json   # Generated JSON Schema for Antigravity config
 ├── logs/                         # Runtime debug log output (gitignored)
 ├── index.ts                      # Package entry point (re-exports plugin factory)
 ├── package.json                  # Dependencies and npm scripts
@@ -153,7 +169,7 @@ opencode-antigravity-auth/
 
 **`docs/`:**
 - Purpose: Supplementary documentation beyond the root README
-- Contains: `ARCHITECTURE.md` (detailed design), `ANTIGRAVITY_API_SPEC.md` (API wire format)
+- Contains: `ARCHITECTURE.md` (detailed design), `ANTIGRAVITY_API_SPEC.md` (API wire format), `CONFIGURATION.md` (config reference), `MODEL-VARIANTS.md` (model variant syntax), `MULTI-ACCOUNT.md` (multi-account guide), `TROUBLESHOOTING.md` (common issues)
 
 ---
 
