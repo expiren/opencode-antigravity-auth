@@ -1426,7 +1426,7 @@ export const createAntigravityPlugin = (providerId: string) => async (
     if (input.event.type === "session.deleted") {
       const props = input.event.properties as Record<string, unknown> | undefined;
       const info = (props?.info ?? {}) as { id?: string; parentID?: string };
-      if (info.parentID && info.id) {
+      if (info.id && (info.parentID || activeChildSessionIds.has(info.id))) {
         activeChildSessionIds.delete(info.id);
         if (activeAccountManager) {
           activeAccountManager.cleanupChildSession(info.id)
@@ -2226,6 +2226,12 @@ if (toastScope === "root_only" && getIsChildSession()) {
               }
             }
             
+            // Track total capacity retries across all while(!shouldSwitchAccount) iterations
+            // to prevent infinite loops when all endpoints persistently return 503/capacity errors.
+            // Without this, capacityRetryCount resets to 0 each iteration and the loop never exits.
+            let totalCapacityRetries = 0;
+            const MAX_TOTAL_CAPACITY_RETRIES = 4; // 2 endpoints × 2 retries each
+
             while (!shouldSwitchAccount) {
             
             // Flag to force thinking recovery on retry after API error
@@ -2344,17 +2350,24 @@ if (toastScope === "root_only" && getIsChildSession()) {
                   // Goal: Wait and Retry SAME Account. DO NOT LOCK.
                   // We handle this FIRST to avoid calling getRateLimitBackoff() and polluting the global rate limit state for transient errors.
                   if (rateLimitReason === "MODEL_CAPACITY_EXHAUSTED" || rateLimitReason === "SERVER_ERROR") {
-                     // Exponential backoff with jitter for capacity errors: 1s → 2s → 4s → 8s (max)
-                     // Matches Antigravity-Manager's ExponentialBackoff(1s, 8s)
+                     totalCapacityRetries++;
+
+                     // Guard: if we've exhausted all capacity retries across all endpoints+iterations,
+                     // force account switch instead of looping forever
+                     if (totalCapacityRetries > MAX_TOTAL_CAPACITY_RETRIES) {
+                       pushDebug(`Total capacity retries (${MAX_TOTAL_CAPACITY_RETRIES}) exhausted, switching account`);
+                       shouldSwitchAccount = true;
+                       break;
+                     }
+
                      const baseDelayMs = 1000;
                      const maxDelayMs = 8000;
                      const exponentialDelay = Math.min(baseDelayMs * Math.pow(2, capacityRetryCount), maxDelayMs);
-                     // Add ±10% jitter to prevent thundering herd
                      const jitter = exponentialDelay * (0.9 + Math.random() * 0.2);
                      const waitMs = Math.round(jitter);
                      const waitSec = Math.round(waitMs / 1000);
                      
-                     pushDebug(`Server busy (${rateLimitReason}) on account ${account.index}, exponential backoff ${waitMs}ms (attempt ${capacityRetryCount + 1})`);
+                     pushDebug(`Server busy (${rateLimitReason}) on account ${account.index}, backoff ${waitMs}ms (attempt ${capacityRetryCount + 1}, total ${totalCapacityRetries}/${MAX_TOTAL_CAPACITY_RETRIES})`);
 
                      await showToast(
                        `⏳ Server busy (${response.status}). Retrying in ${waitSec}s...`,
@@ -2363,15 +2376,12 @@ if (toastScope === "root_only" && getIsChildSession()) {
                      
                      await sleep(waitMs, abortSignal);
                      
-                     // CRITICAL FIX: Decrement i so that the loop 'continue' retries the SAME endpoint index
-                     // (i++ in the loop will bring it back to the current index)
-                     // But limit retries to prevent infinite loops (Greptile feedback)
                      if (capacityRetryCount < 1) {
                        capacityRetryCount++;
                        i -= 1;
                        continue; 
                       } else {
-                        pushDebug(`Max capacity retries (1) exhausted for endpoint ${currentEndpoint}, regenerating fingerprint...`);                        // Regenerate fingerprint to get fresh device identity before trying next endpoint
+                        pushDebug(`Max capacity retries (1) exhausted for endpoint ${currentEndpoint}, regenerating fingerprint...`);
                         const newFingerprint = accountManager.regenerateAccountFingerprint(account.index);
                         if (newFingerprint) {
                           pushDebug(`Fingerprint regenerated for account ${account.index}`);

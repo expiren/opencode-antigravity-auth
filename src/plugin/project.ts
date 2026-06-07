@@ -207,8 +207,12 @@ export async function onboardManagedProject(
             endpoint: baseEndpoint,
             status: response.status,
             statusText: response.statusText,
+            attempt: attempt + 1,
           });
-          break;
+          if (response.status === 403 || response.status === 401) {
+            break;
+          }
+          continue;
         }
 
         const payload = (await response.json()) as OnboardUserPayload;
@@ -220,8 +224,8 @@ export async function onboardManagedProject(
           return projectId;
         }
       } catch (error) {
-        log.debug("Failed to onboard managed project", { endpoint: baseEndpoint, error: String(error) });
-        break;
+        log.debug("Failed to onboard managed project", { endpoint: baseEndpoint, attempt: attempt + 1, error: String(error) });
+        continue;
       }
 
       await wait(delayMs);

@@ -1874,6 +1874,8 @@ export async function transformAntigravityResponse(
       const totalInput = usage.promptTokenCount ?? usage.totalTokenCount ?? 0
       const hitRate = totalInput > 0 ? Math.round((cacheRead / totalInput) * 100) : 0
       const status = cacheRead > 0 ? "HIT" : "MISS"
+      const statsFamily = effectiveModel.includes("claude") ? "claude" : "gemini"
+      _lastCacheStatsByFamily[statsFamily] = { model: effectiveModel, read: cacheRead, total: totalInput, hitRate }
       logCacheStats(effectiveModel, cacheRead, 0, totalInput);
       log.debug(`[Cache] ${status} model=${effectiveModel} read=${cacheRead} total=${totalInput} hitRate=${hitRate}%`)
     }    

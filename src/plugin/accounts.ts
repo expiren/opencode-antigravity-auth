@@ -1103,6 +1103,20 @@ export class AccountManager {
       }
     }
 
+    const shiftIndexSet = (set: Set<number>) => {
+      const shifted = new Set<number>();
+      for (const val of set) {
+        if (val < idx) shifted.add(val);
+        else if (val > idx) shifted.add(val - 1);
+      }
+      set.clear();
+      for (const val of shifted) set.add(val);
+    };
+    shiftIndexSet(this.mainSessionUsedAccounts);
+    for (const state of this.childSessions.values()) {
+      shiftIndexSet(state.usedAccounts);
+    }
+
     return true;
   }
 
