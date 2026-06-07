@@ -807,10 +807,11 @@ export function getPluginSessionId(): string {
   return PLUGIN_SESSION_ID;
 }
 
-let _lastCacheStats: { model: string; read: number; total: number; hitRate: number } | null = null;
+const _lastCacheStatsByFamily: Record<string, { model: string; read: number; total: number; hitRate: number }> = {};
 
-export function getLastCacheStats() {
-  return _lastCacheStats;
+export function getLastCacheStats(family?: string) {
+  if (!family) return null
+  return _lastCacheStatsByFamily[family] ?? null
 }
 const STREAM_ACTION = "streamGenerateContent";
 
@@ -1753,7 +1754,8 @@ export async function transformAntigravityResponse(
             const status = cacheRead > 0 ? "HIT" : "MISS"
             logCacheStats(effectiveModel, cacheRead, 0, totalInput);
             log.debug(`[Cache] ${status} model=${effectiveModel} read=${cacheRead} total=${totalInput} hitRate=${hitRate}%`)
-            _lastCacheStats = { model: effectiveModel, read: cacheRead, total: totalInput, hitRate }
+            const statsFamily = effectiveModel.includes("claude") ? "claude" : "gemini"
+            _lastCacheStatsByFamily[statsFamily] = { model: effectiveModel, read: cacheRead, total: totalInput, hitRate }
           }
         },
         transformThinkingParts,

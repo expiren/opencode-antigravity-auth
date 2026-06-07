@@ -68,8 +68,11 @@
 
 **Session Recovery:**
 - Purpose: Detect interrupted tool executions (`tool_result_missing`) and malformed thinking blocks; inject synthetic completions to restore session
-- Location: `src/plugin/recovery/` (`index.ts`, `types.ts`, `constants.ts`, `storage.ts`), `src/plugin/thinking-recovery.ts`
-- Contains: `createSessionRecoveryHook`, `isRecoverableError`, `handleSessionRecovery`, `analyzeConversationState`, `closeToolLoopForThinking`
+- Location: `src/plugin/recovery.ts`, `src/plugin/recovery/` (`index.ts`, `types.ts`, `constants.ts`, `storage.ts`), `src/plugin/thinking-recovery.ts`
+- Contains:
+  - `recovery.ts`: `createSessionRecoveryHook`, `isRecoverableError`, `detectErrorType`, `handleSessionRecovery`, toast notification helpers
+  - `recovery/` sub-module: recovery state persistence (`recovery/storage.ts`), error-type strings (`recovery/constants.ts`), shared types (`recovery/types.ts`), barrel re-exports (`recovery/index.ts`)
+  - `thinking-recovery.ts`: `analyzeConversationState`, `closeToolLoopForThinking`, `needsThinkingRecovery`, compacted-thinking detection
 - Depends on: OpenCode session client API
 - Used by: `src/plugin.ts` event handler
 

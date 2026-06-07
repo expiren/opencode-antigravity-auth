@@ -41,7 +41,7 @@ import {
 import { EmptyResponseError } from "./plugin/errors";
 import { AntigravityTokenRefreshError, refreshAccessToken } from "./plugin/token";
 import { startOAuthListener, type OAuthListener } from "./plugin/server";
-import { clearAccounts, loadAccounts, saveAccounts, saveAccountsReplace } from "./plugin/storage";
+import { clearAccounts, loadAccounts, saveAccounts, saveAccountsReplace, getConfigDir } from "./plugin/storage";
 import { AccountManager, type ModelFamily, parseRateLimitReason, calculateBackoffMs, computeSoftQuotaCacheTtlMs, resolveQuotaGroup } from "./plugin/accounts";
 import { createAutoUpdateCheckerHook } from "./hooks/auto-update-checker";
 import { buildAuthFromStoredAccount, detectAuthStorageDrift } from "./plugin/auth-drift";
@@ -86,6 +86,36 @@ function getIsChildSession(): boolean {
 }
 
 const log = createLogger("plugin");
+
+async function saveIneligibleAccount(
+  account: { index: number; email?: string },
+  errorBody: string,
+): Promise<void> {
+  try {
+    const { join } = await import("node:path");
+    const { readFile, writeFile } = await import("node:fs/promises");
+    const filePath = join(getConfigDir(), "antigravity-ineligible.json");
+    let existing: Array<{ email?: string; index: number; reason: string; disabledAt: string }> = [];
+    try {
+      const raw = await readFile(filePath, "utf-8");
+      existing = JSON.parse(raw);
+    } catch {
+      // file doesn't exist yet
+    }
+    const alreadyExists = existing.some(e => e.email === account.email);
+    if (!alreadyExists) {
+      existing.push({
+        email: account.email,
+        index: account.index,
+        reason: errorBody.slice(0, 500),
+        disabledAt: new Date().toISOString(),
+      });
+      await writeFile(filePath, JSON.stringify(existing, null, 2), "utf-8");
+    }
+  } catch (err) {
+    log.warn("Failed to save ineligible account", { error: err });
+  }
+}
 
 // Module-level toast debounce to persist across requests (fixes toast spam)
 const rateLimitToastCooldowns = new Map<string, number>();
@@ -1630,7 +1660,11 @@ export const createAntigravityPlugin = (providerId: string) => async (
           const parentSessionId = getHeader("x-parent-session-id")
           const childSessionId = parentSessionId ? (sessionAffinity ?? parentSessionId) : null
           // Fallback for OpenCode versions without session headers
-          const effectiveChildSessionId = childSessionId ?? (getIsChildSession() ? "__heuristic__" : null)
+          // Only fall back to heuristic when OpenCode sends NO session headers at all.
+          // If sessionAffinity is present but parentSessionId is null, this IS the main session — trust the headers.
+          const effectiveChildSessionId = childSessionId ?? (
+            !sessionAffinity && getIsChildSession() ? "__heuristic__" : null
+          )
 
           const debugLines: string[] = [];
           const pushDebug = (line: string) => {
@@ -1641,7 +1675,7 @@ export const createAntigravityPlugin = (providerId: string) => async (
           if (sessionAffinity || parentSessionId) {
             pushDebug(`[Session] affinity=${sessionAffinity} parent=${parentSessionId} child=${effectiveChildSessionId !== null}`)
           }
-          const cachedStats = getLastCacheStats()
+          const cachedStats = getLastCacheStats(family ?? undefined)
           if (cachedStats) {
             const label = cachedStats.hitRate > 0 ? "HIT" : "MISS"
             pushDebug(`[Cache] ${label} model=${cachedStats.model} read=${cachedStats.read} total=${cachedStats.total} hitRate=${cachedStats.hitRate}%`)
@@ -2527,6 +2561,26 @@ if (toastScope === "root_only" && getIsChildSession()) {
 
                     pushDebug(`verification-required: disabled account ${account.index}`);
                     getHealthTracker().recordFailure(account.index);
+
+                    lastFailure = createFailureContext(response);
+                    shouldSwitchAccount = true;
+                    break;
+                  }
+
+                  const isIneligible = errorBodyText.toLowerCase().includes("not eligible") ||
+                    errorBodyText.toLowerCase().includes("not authorized")
+                  if (isIneligible) {
+                    const label = account.email || `Account ${account.index + 1}`;
+                    accountManager.setAccountEnabled(account.index, false);
+                    accountManager.requestSaveToDisk();
+                    void saveIneligibleAccount(account, errorBodyText)
+                    pushDebug(`ineligible: disabled account ${account.index} (${label})`)
+                    getHealthTracker().recordFailure(account.index);
+
+                    if (accountManager.shouldShowAccountToast(account.index, 60000)) {
+                      await showToast(`⛔ ${label} not eligible for Gemini Code Assist. Disabled.`, "warning");
+                      accountManager.markToastShown(account.index);
+                    }
 
                     lastFailure = createFailureContext(response);
                     shouldSwitchAccount = true;

@@ -17,7 +17,7 @@ opencode-antigravity-auth/
 │       ├── auth-doctor.ts        # Self-healing diagnostics for auth storage drift
 │       ├── auth-drift.ts         # Detection of drift between active auth and storage
 │       ├── auth.ts               # Token validation, refresh-parts parsing
-│       ├── cache.ts              # Thin re-export of cache/ module
+│       ├── cache.ts              # Auth token caching (Map), in-memory thinking signature cache, disk cache init; re-exports SignatureCache from cache/
 │       ├── cli.ts                # Interactive terminal prompts (login, project ID)
 │       ├── debug.ts              # Debug file logging: request/response dumps
 │       ├── errors.ts             # Domain error classes (EmptyResponseError, etc.)
@@ -28,7 +28,7 @@ opencode-antigravity-auth/
 │       ├── model-registry.ts     # Centralized model specifications and quota groups
 │       ├── project.ts            # Managed project context resolution
 │       ├── quota.ts              # Quota API queries; QuotaGroup types, endpoint fallbacks and per-model tracking
-│       ├── recovery.ts           # Thin re-export / error-type detection helpers
+│       ├── recovery.ts           # Session recovery hook: createSessionRecoveryHook, detectErrorType, isRecoverableError, handleSessionRecovery, toast management
 │       ├── refresh-queue.ts      # Proactive background OAuth token refresh
 │       ├── request.ts            # Core request transform & response transform
 │       ├── request-helpers.ts    # Schema cleaning, thinking filters, tool helpers
