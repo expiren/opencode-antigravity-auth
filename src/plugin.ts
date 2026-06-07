@@ -1418,6 +1418,12 @@ export const createAntigravityPlugin = (providerId: string) => async (
         activeChildSessionIds.add(info.id);
         log.debug("child-session-started", { sessionId: info.id, parentID: info.parentID, activeChildren: activeChildSessionIds.size });
       } else {
+        // Clean up AccountManager child session state for all tracked child sessions
+        if (activeAccountManager && activeChildSessionIds.size > 0) {
+          for (const childId of activeChildSessionIds) {
+            activeAccountManager.cleanupChildSession(childId)
+          }
+        }
         activeChildSessionIds.clear();
         log.debug("root-session-detected", { activeChildren: 0 });
       }
@@ -2354,7 +2360,7 @@ if (toastScope === "root_only" && getIsChildSession()) {
 
                      // Guard: if we've exhausted all capacity retries across all endpoints+iterations,
                      // force account switch instead of looping forever
-                     if (totalCapacityRetries > MAX_TOTAL_CAPACITY_RETRIES) {
+                     if (totalCapacityRetries >= MAX_TOTAL_CAPACITY_RETRIES) {
                        pushDebug(`Total capacity retries (${MAX_TOTAL_CAPACITY_RETRIES}) exhausted, switching account`);
                        shouldSwitchAccount = true;
                        break;
