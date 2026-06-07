@@ -12,7 +12,7 @@ import { authorizeAntigravity, exchangeAntigravity } from "./antigravity/oauth";
 import type { AntigravityTokenExchangeResult } from "./antigravity/oauth";
 import { accessTokenExpired, isOAuthAuth, parseRefreshParts, formatRefreshParts } from "./plugin/auth";
 import { promptAddAnotherAccount, promptLoginMode, promptProjectId } from "./plugin/cli";
-import { ensureProjectContext } from "./plugin/project";
+import { ensureProjectContext, clearProvisionFailedKeys } from "./plugin/project";
 import {
   startAntigravityDebugRequest, 
   logAntigravityDebugResponse,
@@ -3014,6 +3014,7 @@ if (toastScope === "root_only" && getIsChildSession()) {
 
                 if (menuResult.mode === "check") {
                   console.log("\n📊 Checking quotas for all accounts...\n");
+                  clearProvisionFailedKeys();
                   const results = await checkAccountsQuota(existingStorage.accounts, client, providerId);
                   let storageUpdated = false;
                   

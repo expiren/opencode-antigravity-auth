@@ -20,6 +20,7 @@ interface CachedProjectContext {
 
 const projectContextResultCache = new Map<string, CachedProjectContext>();
 const projectContextPendingCache = new Map<string, Promise<ProjectContextResult>>();
+const provisionFailedKeys = new Set<string>();
 const CODE_ASSIST_METADATA = {
   ideType: "ANTIGRAVITY",
   platform: process.platform === "win32" ? "WINDOWS" : "MACOS",
@@ -116,10 +117,16 @@ export function invalidateProjectContextCache(refresh?: string): void {
   if (!refresh) {
     projectContextPendingCache.clear();
     projectContextResultCache.clear();
+    provisionFailedKeys.clear();
     return;
   }
   projectContextPendingCache.delete(refresh);
   projectContextResultCache.delete(refresh);
+  provisionFailedKeys.delete(refresh);
+}
+
+export function clearProvisionFailedKeys(): void {
+  provisionFailedKeys.clear();
 }
 
 /**
@@ -265,6 +272,12 @@ export async function ensureProjectContext(auth: OAuthAuthDetails): Promise<Proj
     }
 
     const fallbackProjectId = ANTIGRAVITY_DEFAULT_PROJECT_ID;
+
+    if (cacheKey && provisionFailedKeys.has(cacheKey)) {
+      const effectiveProjectId = parts.projectId || fallbackProjectId;
+      return { auth, effectiveProjectId };
+    }
+
     const persistManagedProject = async (managedProjectId: string): Promise<ProjectContextResult> => {
       const updatedAuth: OAuthAuthDetails = {
         ...auth,
@@ -305,6 +318,10 @@ export async function ensureProjectContext(auth: OAuthAuthDetails): Promise<Proj
     log.warn("Failed to provision managed project - account may not work correctly", {
       hasProjectId: !!parts.projectId,
     });
+
+    if (cacheKey) {
+      provisionFailedKeys.add(cacheKey);
+    }
 
     if (parts.projectId) {
       return { auth, effectiveProjectId: parts.projectId };
