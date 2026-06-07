@@ -1398,6 +1398,9 @@ export const createAntigravityPlugin = (providerId: string) => async (
       const info = (props?.info ?? {}) as { id?: string; parentID?: string };
       if (info.parentID && info.id) {
         activeChildSessionIds.delete(info.id);
+        if (activeAccountManager) {
+          activeAccountManager.cleanupChildSession(info.id)
+        }
         log.debug("child-session-ended", { sessionId: info.id, activeChildren: activeChildSessionIds.size });
       }
     }
@@ -1614,12 +1617,30 @@ export const createAntigravityPlugin = (providerId: string) => async (
           const urlString = toUrlString(input);
           const family = getModelFamilyFromUrl(urlString);
           const model = extractModelFromUrl(urlString);
+
+          // Per-request child session detection via OpenCode headers
+          const getHeader = (name: string): string | null => {
+            if (!init?.headers) return null
+            if (typeof (init.headers as Headers).get === "function") {
+              return (init.headers as Headers).get(name)
+            }
+            return (init.headers as Record<string, string>)[name] ?? null
+          }
+          const sessionAffinity = getHeader("x-session-affinity")
+          const parentSessionId = getHeader("x-parent-session-id")
+          const childSessionId = parentSessionId ? (sessionAffinity ?? parentSessionId) : null
+          // Fallback for OpenCode versions without session headers
+          const effectiveChildSessionId = childSessionId ?? (getIsChildSession() ? "__heuristic__" : null)
+
           const debugLines: string[] = [];
           const pushDebug = (line: string) => {
             if (!isDebugEnabled() && !isDebugTuiEnabled()) return;
             debugLines.push(line);
           };
           pushDebug(`request=${urlString}`);
+          if (sessionAffinity || parentSessionId) {
+            pushDebug(`[Session] affinity=${sessionAffinity} parent=${parentSessionId} child=${effectiveChildSessionId !== null}`)
+          }
           const cachedStats = getLastCacheStats()
           if (cachedStats) {
             const label = cachedStats.hitRate > 0 ? "HIT" : "MISS"
@@ -1724,15 +1745,15 @@ if (toastScope === "root_only" && getIsChildSession()) {
               config.pid_offset_enabled,
               config.soft_quota_threshold_percent,
               softQuotaCacheTtlMs,
-              getIsChildSession(),
+              effectiveChildSessionId,
             );
 
             if (account) {
-              const childSession = getIsChildSession();
-              const mainIdx = childSession ? accountManager.getMainAccountIndex(family) : -1;
+              const isChild = effectiveChildSessionId !== null;
+              const mainIdx = isChild ? accountManager.getMainAccountIndex(family) : -1;
               pushDebug(
-                `[AccountSelect] idx=${account.index} family=${family} child=${childSession}` +
-                (childSession ? ` mainIdx=${mainIdx} isolated=${account.index !== mainIdx}` : ""),
+                `[AccountSelect] idx=${account.index} family=${family} child=${isChild}` +
+                (isChild ? ` mainIdx=${mainIdx} isolated=${account.index !== mainIdx}` : ""),
               );
             }
 
@@ -1747,7 +1768,7 @@ if (toastScope === "root_only" && getIsChildSession()) {
                 config.pid_offset_enabled,
                 config.soft_quota_threshold_percent,
                 softQuotaCacheTtlMs,
-                getIsChildSession(),
+                effectiveChildSessionId,
               );
               if (account) {
                 pushDebug(
@@ -1857,7 +1878,7 @@ if (toastScope === "root_only" && getIsChildSession()) {
               pushDebug(`account-switch: ${previousAccountIndex} → ${account.index}, warmup=${needsCacheWarmup}`);
             }
             previousAccountIndex = account.index;
-            accountManager.recordSessionUsage(account.index, getIsChildSession());
+            accountManager.recordSessionUsage(account.index, effectiveChildSessionId);
             if (isDebugEnabled()) {
               logAccountContext("Selected", {
                 index: account.index,
@@ -2554,22 +2575,21 @@ if (toastScope === "root_only" && getIsChildSession()) {
                     model,
                     proactiveThreshold,
                     softQuotaCacheTtlMs,
-                    getIsChildSession(),
+                    effectiveChildSessionId,
                   )) {
-                    const childSession = getIsChildSession();
                     const rotated = accountManager.proactivelyRotateForFamily(
                       family,
                       model,
                       headerStyle,
                       config.soft_quota_threshold_percent,
                       softQuotaCacheTtlMs,
-                      childSession,
+                      effectiveChildSessionId,
                     );
                     if (rotated) {
                       const remaining = account.cachedQuota?.[resolveQuotaGroup(family, model)]?.remainingFraction;
                       const remainingPct = remaining != null ? `${(remaining * 100).toFixed(1)}%` : "?";
                       pushDebug(`[ProactiveRotation] account ${account.index} quota ${remainingPct} < ${proactiveThreshold}%, pre-switched to account ${rotated.index} for next request`);
-                      pushDebug(`[ProactiveRotation] ${account.index} → ${rotated.index} (warm=${accountManager.wasUsedInSession(rotated.index, childSession)})`);
+                      pushDebug(`[ProactiveRotation] ${account.index} → ${rotated.index} (warm=${accountManager.wasUsedInSession(rotated.index, effectiveChildSessionId)})`);
                     }
                   }
                 }                logAntigravityDebugResponse(debugContext, response, {
