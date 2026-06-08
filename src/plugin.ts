@@ -1647,9 +1647,11 @@ export const createAntigravityPlugin = (providerId: string) => async (
           }
 
           if (accountManager.getAccountCount() === 0) {
-            throw new Error("No Antigravity accounts configured. Run `opencode auth login`.");
+            return createSyntheticErrorResponse(
+              "No Antigravity accounts configured. Run `opencode auth login`.",
+              "unknown",
+            );
           }
-
           const urlString = toUrlString(input);
           const family = getModelFamilyFromUrl(urlString);
           const model = extractModelFromUrl(urlString);
@@ -1769,9 +1771,11 @@ if (toastScope === "root_only" && getIsChildSession()) {
             } = routingDecision;
             
             if (accountCount === 0) {
-              throw new Error("No Antigravity accounts available. Run `opencode auth login`.");
+              return createSyntheticErrorResponse(
+                "No Antigravity accounts available. Run `opencode auth login`.",
+                model ?? "unknown",
+              );
             }
-
             const softQuotaCacheTtlMs = computeSoftQuotaCacheTtlMs(
               config.soft_quota_cache_ttl_minutes,
               config.quota_refresh_interval_minutes,
@@ -1822,9 +1826,10 @@ if (toastScope === "root_only" && getIsChildSession()) {
               // Prevent infinite null-account wait loops - cap at maxAccountSwitches iterations
               if (nullAccountLoopCount > maxAccountSwitches) {
                 pushDebug(`null-account-loop-cap: exceeded ${maxAccountSwitches} iterations without finding available account`);
-                throw new Error(
+                return createSyntheticErrorResponse(
                   `All ${accountCount} account(s) exhausted for ${family} after ${nullAccountLoopCount} retry iterations. ` +
-                  `Add more accounts with \`opencode auth login\` or wait for quota reset.`
+                  `Add more accounts with \`opencode auth login\` or wait for quota reset.`,
+                  model ?? "unknown",
                 );
               }
 
@@ -1839,12 +1844,12 @@ if (toastScope === "root_only" && getIsChildSession()) {
                     `All accounts over ${threshold}% quota threshold. Resets in ${waitTimeFormatted}.`,
                     "error"
                   );
-                  throw new Error(
+                  return createSyntheticErrorResponse(
                     `Quota protection: All ${accountCount} account(s) are over ${threshold}% usage for ${family}. ` +
                     `Quota resets in ${waitTimeFormatted}. ` +
-                    `Add more accounts, wait for quota reset, or set soft_quota_threshold_percent: 100 to disable.`
-                  );
-                }
+                    `Add more accounts, wait for quota reset, or set soft_quota_threshold_percent: 100 to disable.`,
+                    model ?? "unknown",
+                  );                }
                 
                 const waitSecValue = Math.max(1, Math.ceil(softQuotaWaitMs / 1000));
                 pushDebug(`all-over-soft-quota family=${family} accounts=${accountCount} waitMs=${softQuotaWaitMs}`);
@@ -1889,12 +1894,12 @@ if (toastScope === "root_only" && getIsChildSession()) {
                 );
                 
                 // Return a proper rate limit error response
-                throw new Error(
+                return createSyntheticErrorResponse(
                   `All ${accountCount} account(s) rate-limited for ${family}. ` +
                   `Quota resets in ${waitTimeFormatted}. ` +
-                  `Add more accounts with \`opencode auth login\` or wait and retry.`
-                );
-              }
+                  `Add more accounts with \`opencode auth login\` or wait and retry.`,
+                  model ?? "unknown",
+                );              }
 
               if (!rateLimitToastShown) {
                 await showToast(`All ${accountCount} account(s) rate-limited for ${family}. Waiting ${waitSecValue}s...`, "warning");
@@ -1990,10 +1995,10 @@ if (toastScope === "root_only" && getIsChildSession()) {
                       log.error("Failed to clear stored Antigravity OAuth credentials", { error: String(storeError) });
                     }
 
-                    throw new Error(
+                    return createSyntheticErrorResponse(
                       "All Antigravity accounts have invalid refresh tokens. Run `opencode auth login` and reauthenticate.",
-                    );
-                  }
+                      model ?? "unknown",
+                    );                  }
 
                   lastError = error;
                   continue;
@@ -2015,9 +2020,11 @@ if (toastScope === "root_only" && getIsChildSession()) {
             if (!accessToken) {
               lastError = new Error("Missing access token");
               if (accountCount <= 1) {
-                throw lastError;
-              }
-              continue;
+                return createSyntheticErrorResponse(
+                  "Missing access token. Run `opencode auth login` to reauthenticate.",
+                  model ?? "unknown",
+                );
+              }              continue;
             }
 
             let projectContext: ProjectContextResult;
@@ -2716,12 +2723,10 @@ if (toastScope === "root_only" && getIsChildSession()) {
                     
                     // Clean up and throw after max attempts
                     emptyResponseAttempts.delete(emptyAttemptKey);
-                    throw new EmptyResponseError(
-                      "antigravity",
+                    return createSyntheticErrorResponse(
+                      `Empty response after ${currentAttempts} attempts for model ${prepared.effectiveModel ?? "unknown"}.`,
                       prepared.effectiveModel ?? "unknown",
-                      currentAttempts,
-                    );
-                  }
+                    );                  }
                   
                   // Clean up successful attempt tracking
                   const emptyAttemptKeyClean = `${prepared.sessionId ?? "none"}:${prepared.effectiveModel ?? "unknown"}`;
@@ -2867,7 +2872,10 @@ if (toastScope === "root_only" && getIsChildSession()) {
                     debugLines,
                   );
                 }
-                throw lastError || new Error(`Exceeded max account switches (${maxAccountSwitches}). All accounts rate-limited.`);
+                return createSyntheticErrorResponse(
+                  lastError?.message || `Exceeded max account switches (${maxAccountSwitches}). All accounts rate-limited.`,
+                  model ?? "unknown",
+                );
               }
               
               // Avoid tight retry loops when there's only one account.
@@ -2888,7 +2896,10 @@ if (toastScope === "root_only" && getIsChildSession()) {
                   );
                 }
 
-                throw lastError || new Error("All Antigravity endpoints failed");
+                return createSyntheticErrorResponse(
+                  lastError?.message || "All Antigravity endpoints failed",
+                  model ?? "unknown",
+                );
               }
 
               continue;
@@ -2912,7 +2923,10 @@ if (toastScope === "root_only" && getIsChildSession()) {
               );
             }
 
-            throw lastError || new Error("All Antigravity accounts failed");
+            return createSyntheticErrorResponse(
+              lastError?.message || "All Antigravity accounts failed",
+              model ?? "unknown",
+            );
           }
         },
       };
