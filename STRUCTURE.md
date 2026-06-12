@@ -175,7 +175,7 @@ opencode-antigravity-auth/
 
 ## Key File Locations
 
-**Entry Point:** `index.ts` — re-exports `createAntigravityPlugin` as the npm package entry
+**Entry Point:** `index.ts` — re-exports `AntigravityCLIOAuthPlugin` and `GoogleOAuthPlugin` as the npm package entry; also re-exports `authorizeAntigravity` and `exchangeAntigravity` OAuth primitives
 **Plugin Orchestrator:** `src/plugin.ts` — main plugin factory with all auth and request logic
 **Constants:** `src/constants.ts` — all endpoints, headers, OAuth IDs, system prompts, tool constants
 **Config Schema:** `src/plugin/config/schema.ts` — full `AntigravityConfigSchema` with field docs

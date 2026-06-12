@@ -14,11 +14,11 @@ import { getAntigravityVersion } from "../constants";
 
 const OS_VERSIONS: Record<string, string[]> = {
   darwin: ["10.15.7", "11.6.8", "12.6.3", "13.5.2", "14.2.1", "14.5"],
-  win32: ["10.0.19041", "10.0.19042", "10.0.19043", "10.0.22000", "10.0.22621", "10.0.22631"],
+  windows: ["10.0.19041", "10.0.19042", "10.0.19043", "10.0.22000", "10.0.22621", "10.0.22631"],
   linux: ["5.15.0", "5.19.0", "6.1.0", "6.2.0", "6.5.0", "6.6.0"],
 };
 
-const ARCHITECTURES = ["x64", "arm64"];
+const ARCHITECTURES = ["amd64", "arm64"];
 
 const IDE_TYPES = [
   "ANTIGRAVITY",
@@ -67,7 +67,7 @@ export interface FingerprintHeaders {
   "User-Agent": string;
 }
 
-const PLATFORM_CHOICES = ["darwin", "win32"] as const;
+const PLATFORM_CHOICES = ["darwin", "windows"] as const;
 type PlatformChoice = typeof PLATFORM_CHOICES[number];
 
 function randomFrom<T>(arr: readonly T[]): T {
@@ -76,7 +76,7 @@ function randomFrom<T>(arr: readonly T[]): T {
 }
 
 function platformToDisplayName(platform: string): "WINDOWS" | "MACOS" {
-  return platform === "win32" ? "WINDOWS" : "MACOS";
+  return platform === "windows" ? "WINDOWS" : "MACOS";
 }
 function generateDeviceId(): string {
   return crypto.randomUUID();
@@ -98,7 +98,7 @@ export function generateFingerprint(): Fingerprint {
   return {
     deviceId: generateDeviceId(),
     sessionToken: generateSessionToken(),
-    userAgent: `antigravity/${getAntigravityVersion()} ${platform}/${arch}`,
+    userAgent: `antigravity/ide/${getAntigravityVersion()} ${platform}/${arch}`,
     apiClient: randomFrom(SDK_CLIENTS),
     clientMetadata: {
       ideType: randomFrom(IDE_TYPES),
@@ -114,13 +114,16 @@ export function generateFingerprint(): Fingerprint {
  * Uses real OS info instead of randomized values.
  */
 export function collectCurrentFingerprint(): Fingerprint {
-  const platform = os.platform();
-  const arch = os.arch();
+  const nodePlatform = os.platform();
+  const nodeArch = os.arch();
+  // Map Node.js platform/arch to Go-style names matching real Antigravity IDE
+  const platform = nodePlatform === "win32" ? "windows" : nodePlatform;
+  const arch = nodeArch === "x64" ? "amd64" : nodeArch;
 
   return {
     deviceId: generateDeviceId(),
     sessionToken: generateSessionToken(),
-    userAgent: `antigravity/${getAntigravityVersion()} ${platform}/${arch}`,
+    userAgent: `antigravity/ide/${getAntigravityVersion()} ${platform}/${arch}`,
     apiClient: "google-cloud-sdk vscode_cloudshelleditor/0.1",
     clientMetadata: {
       ideType: "ANTIGRAVITY",
@@ -138,14 +141,14 @@ export function collectCurrentFingerprint(): Fingerprint {
  */
 export function updateFingerprintVersion(fingerprint: Fingerprint): boolean {
   const currentVersion = getAntigravityVersion();
-  const versionPattern = /^(antigravity\/)([\d.]+)/;
-  const match = fingerprint.userAgent.match(versionPattern);
+  // Match both old format (antigravity/X.Y.Z) and new format (antigravity/ide/X.Y.Z)
+  const versionPattern = /^antigravity\/(?:ide\/)?[\d.]+/;
 
-  if (!match || match[2] === currentVersion) {
+  if (fingerprint.userAgent.startsWith(`antigravity/ide/${currentVersion}`)) {
     return false;
   }
 
-  fingerprint.userAgent = fingerprint.userAgent.replace(versionPattern, `$1${currentVersion}`);
+  fingerprint.userAgent = fingerprint.userAgent.replace(versionPattern, `antigravity/ide/${currentVersion}`);
   return true;
 }
 

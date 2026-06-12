@@ -67,7 +67,7 @@ export const GEMINI_CLI_ENDPOINT = ANTIGRAVITY_ENDPOINT_PROD;
  */
 export const ANTIGRAVITY_DEFAULT_PROJECT_ID = "rising-fact-p41fc";
 
-export const ANTIGRAVITY_VERSION_FALLBACK = "1.18.3";
+export const ANTIGRAVITY_VERSION_FALLBACK = "2.0.4";
 let antigravityVersion = ANTIGRAVITY_VERSION_FALLBACK;
 let versionLocked = false;
 
@@ -155,7 +155,7 @@ export function getRandomizedHeaders(style: HeaderStyle, model?: string): Header
   }  const platform = randomFrom(ANTIGRAVITY_PLATFORMS);
   const metadataPlatform = platform.startsWith("windows") ? "WINDOWS" : "MACOS";
   return {
-    "User-Agent": `antigravity/${getAntigravityVersion()} ${platform}`,
+    "User-Agent": `antigravity/ide/${getAntigravityVersion()} ${platform}`,
     "X-Goog-Api-Client": randomFrom(ANTIGRAVITY_API_CLIENTS),
     "Client-Metadata": `{"ideType":"ANTIGRAVITY","platform":"${metadataPlatform}","pluginType":"GEMINI"}`,
   };

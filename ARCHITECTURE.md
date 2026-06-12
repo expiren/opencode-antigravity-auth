@@ -223,13 +223,13 @@
 
 **Plugin Factory:**
 - Location: `src/plugin.ts` → `createAntigravityPlugin(providerId)`
-- Triggers: OpenCode loads `index.ts` which imports and calls `createAntigravityPlugin("google")`
+- Triggers: The factory is invoked at module load time inside `src/plugin.ts` with `ANTIGRAVITY_PROVIDER_ID` (`"google"`) to produce the pre-built instances exported via `index.ts`
 - Responsibilities: Initialize all subsystems, register auth methods, return `PluginResult` with `loader`, `auth`, `event`, and `tool` surfaces
 
 **Root Index:**
 - Location: `index.ts`
-- Triggers: OpenCode plugin host imports the package
-- Responsibilities: Re-export `createAntigravityPlugin` as the package entry
+- Triggers: OpenCode plugin host imports the package; the host calls the pre-built export with `{ client, directory }`
+- Responsibilities: Re-export `AntigravityCLIOAuthPlugin` (and alias `GoogleOAuthPlugin`) as the package entry points; also re-export `authorizeAntigravity` and `exchangeAntigravity` OAuth primitives for direct use
 
 **Auto-Update Hook:**
 - Location: `src/hooks/auto-update-checker/index.ts`
