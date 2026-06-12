@@ -110,7 +110,7 @@ const PUBLIC_MODEL_DEFINITIONS: OpencodeModelDefinitions = {
   "antigravity-claude-sonnet-4-6-thinking": defineModel("antigravity-claude-sonnet-4-6-thinking", {
     name: "Claude Sonnet 4.6 Thinking (Antigravity)",
     reasoning: true,
-    limit: { context: 200000, output: 64000 },
+    limit: { context: 250000, output: 64000 },
     modalities: DEFAULT_MODALITIES,
     variants: {
       low: { thinkingConfig: { thinkingBudget: 8192 } },
@@ -120,7 +120,7 @@ const PUBLIC_MODEL_DEFINITIONS: OpencodeModelDefinitions = {
   "antigravity-claude-opus-4-6-thinking": defineModel("antigravity-claude-opus-4-6-thinking", {
     name: "Claude Opus 4.6 Thinking (Antigravity)",
     reasoning: true,
-    limit: { context: 200000, output: 64000 },
+    limit: { context: 250000, output: 64000 },
     modalities: DEFAULT_MODALITIES,
     variants: {
       low: { thinkingConfig: { thinkingBudget: 8192 } },
@@ -138,8 +138,8 @@ const PUBLIC_MODEL_DEFINITIONS: OpencodeModelDefinitions = {
   }),
   "antigravity-gpt-oss-120b": defineModel("antigravity-gpt-oss-120b", {
     name: "GPT-OSS 120B (Antigravity)",
-    reasoning: false,
-    limit: { context: 128000, output: 16384 },
+    reasoning: true,
+    limit: { context: 131072, output: 32768 },
     modalities: DEFAULT_MODALITIES,
     variants: {
       medium: {},
@@ -203,7 +203,7 @@ const PUBLIC_MODEL_DEFINITIONS: OpencodeModelDefinitions = {
 
 const RESOLVER_ALIASES: Record<string, string> = {
   "gemini-3.1-pro-low": "gemini-3.1-pro",
-  "gemini-3.1-pro-high": "gemini-3.1-pro",
+  "gemini-3.1-pro-high": "gemini-pro-agent",
   "gemini-3-flash-low": "gemini-3-flash",
   "gemini-3-flash-medium": "gemini-3-flash",
   "gemini-3-flash-high": "gemini-3-flash",
@@ -246,6 +246,10 @@ const QUOTA_GROUP_BY_MODEL_ID: Record<string, ModelQuotaGroup> = {
   "gemini-3.1-flash-image": "gemini-flash",
   "gpt-oss-120b": "gpt-oss",
   "gpt-oss-120b-medium": "gpt-oss",
+  "gemini-3.5-flash-extra-low": "gemini-flash",
+  "gemini-2.5-flash-lite": "gemini-flash",
+  "gemini-2.5-flash-thinking": "gemini-flash",
+  "gemini-3.1-flash-lite": "gemini-flash",
 }
 
 export const OPENCODE_MODEL_DEFINITIONS = PUBLIC_MODEL_DEFINITIONS

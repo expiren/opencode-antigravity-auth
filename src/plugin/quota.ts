@@ -1,8 +1,8 @@
 import {
   ANTIGRAVITY_ENDPOINT_FALLBACKS,
-  getAntigravityHeaders,
   ANTIGRAVITY_PROVIDER_ID,
   buildGeminiCliUserAgent,
+  getContentRequestUserAgent,
 } from "../constants";import { accessTokenExpired, formatRefreshParts, parseRefreshParts } from "./auth";
 import { logQuotaFetch, logQuotaStatus } from "./debug";
 import { ensureProjectContext } from "./project";
@@ -214,7 +214,7 @@ async function fetchAvailableModels(
   accessToken: string,
   projectId: string,
 ): Promise<FetchAvailableModelsResponse> {
-  const quotaUserAgent = getAntigravityHeaders()["User-Agent"] || "antigravity/windows/amd64";
+  const quotaUserAgent = getContentRequestUserAgent();
   const errors: string[] = [];
 
   for (const endpoint of ANTIGRAVITY_ENDPOINT_FALLBACKS) {
