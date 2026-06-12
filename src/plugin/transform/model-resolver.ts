@@ -28,6 +28,13 @@ export const THINKING_TIER_BUDGETS = {
 } as const;
 
 /**
+ * Default Claude thinking budget matching the real Antigravity API response.
+ * The API reports thinkingBudget: 1024 for Claude models when no tier is specified.
+ * Users override via :low (8192), :medium (16384), :high (32768) suffixes.
+ */
+const CLAUDE_DEFAULT_THINKING_BUDGET = 1024;
+
+/**
  * Gemini 3 uses thinkingLevel strings instead of numeric budgets.
  * Flash supports: minimal, low, medium, high
  * Pro supports: low, high (no minimal/medium)
@@ -228,13 +235,13 @@ export function resolveModelWithTier(requestedModel: string, options: ModelResol
         explicitQuota,
       };
     }
-    // Claude thinking models without explicit tier get medium budget (16384)
-    // Saves ~16K thinking tokens/request vs high (32768) with minimal quality impact.
-    // Users can override with :high suffix for complex reasoning tasks.
+    // Claude thinking models without explicit tier get API default budget (1024)
+    // Real Antigravity IDE reports thinkingBudget: 1024 as default.
+    // Users can override with :low (8192), :medium (16384), or :high (32768) suffix.
     if (isClaudeThinking) {
       return {
         actualModel: resolvedModel,
-        thinkingBudget: THINKING_TIER_BUDGETS.claude.medium,
+        thinkingBudget: CLAUDE_DEFAULT_THINKING_BUDGET,
         isThinkingModel: true,
         quotaPreference,
         explicitQuota,

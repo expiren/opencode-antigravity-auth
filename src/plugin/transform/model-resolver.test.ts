@@ -140,10 +140,10 @@ describe("resolveModelWithTier", () => {
   });
 
   describe("Claude thinking models default budget", () => {
-    it("antigravity-claude-opus-4-6-thinking gets default medium budget (16384)", () => {
+    it("antigravity-claude-opus-4-6-thinking gets API default budget (1024)", () => {
       const result = resolveModelWithTier("antigravity-claude-opus-4-6-thinking");
       expect(result.actualModel).toBe("claude-opus-4-6-thinking");
-      expect(result.thinkingBudget).toBe(16384);
+      expect(result.thinkingBudget).toBe(1024);
       expect(result.isThinkingModel).toBe(true);
       expect(result.quotaPreference).toBe("antigravity");
     });
