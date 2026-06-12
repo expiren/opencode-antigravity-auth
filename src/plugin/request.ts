@@ -74,9 +74,6 @@ const log = createLogger("request");
 
 const PLUGIN_SESSION_ID = `-${crypto.randomUUID()}`;
 
-// Stable numeric session ID for API envelope — matches real IDE format (negative 19-digit number)
-const PLUGIN_API_SESSION_ID = `-${Date.now()}${Math.floor(Math.random() * 1e6).toString().padStart(6, '0')}`;
-
 const sessionDisplayedThinkingHashes = new Set<string>();
 
 const MIN_SIGNATURE_LENGTH = 50;

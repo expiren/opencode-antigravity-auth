@@ -98,15 +98,8 @@ export interface SearchResult {
 // Helper Functions
 // ============================================================================
 
-// Stable numeric session ID for search requests — matches real IDE format
-const SEARCH_API_SESSION_ID = `-${Date.now()}${Math.floor(Math.random() * 1e6).toString().padStart(6, '0')}`;
-
 function generateRequestId(): string {
   return `search/${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
-}
-
-function getSessionId(): string {
-  return SEARCH_API_SESSION_ID;
 }
 
 function formatSearchResult(result: SearchResult): string {
