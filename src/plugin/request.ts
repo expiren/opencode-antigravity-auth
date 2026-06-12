@@ -957,12 +957,10 @@ export function prepareAntigravityRequest(
 
         if (requestObjects.length > 0) {
           sessionId = signatureSessionKey;
-          // sessionId at envelope top-level in numeric format (matches real IDE)
-          wrappedBody.sessionId = PLUGIN_API_SESSION_ID;
         }
 
         for (const req of requestObjects) {
-          // Strip any nested sessionId — it belongs at the envelope top-level
+          // Strip any nested sessionId from individual request objects
           delete (req as any).sessionId;
           stripInjectedDebugFromRequestPayload(req as Record<string, unknown>);
 
@@ -1573,7 +1571,6 @@ export function prepareAntigravityRequest(
           project: effectiveProjectId,
           model: effectiveModel,
           request: requestPayload,
-          enabledCreditTypes: ["GOOGLE_ONE_AI"],
         };
 
         if (headerStyle === "antigravity") {
@@ -1584,8 +1581,6 @@ export function prepareAntigravityRequest(
         if (wrappedBody.request && typeof wrappedBody.request === 'object') {
           // Use stable session ID for signature caching across multi-turn conversations
           sessionId = signatureSessionKey;
-          // sessionId goes at envelope top-level, not inside request (matches real IDE)
-          wrappedBody.sessionId = PLUGIN_API_SESSION_ID;
         }
 
         body = safeStringify(wrappedBody);

@@ -264,8 +264,6 @@ export async function executeSearch(
     model: SEARCH_MODEL,
     userAgent: "antigravity",
     requestId: generateRequestId(),
-    enabledCreditTypes: ["GOOGLE_ONE_AI"],
-    sessionId: getSessionId(),
     request: {
       ...requestPayload,
     },
