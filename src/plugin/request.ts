@@ -1574,12 +1574,13 @@ export function prepareAntigravityRequest(
         if (headerStyle === "antigravity") {
           wrappedBody.requestType = "agent";
           wrappedBody.userAgent = "antigravity";
-          wrappedBody.requestId = "agent-" + crypto.randomUUID();
+          wrappedBody.requestId = "agent/" + crypto.randomUUID();
         }
         if (wrappedBody.request && typeof wrappedBody.request === 'object') {
           // Use stable session ID for signature caching across multi-turn conversations
           sessionId = signatureSessionKey;
-          (wrappedBody.request as any).sessionId = signatureSessionKey;
+          // sessionId goes at envelope top-level, not inside request (matches real IDE)
+          wrappedBody.sessionId = signatureSessionKey;
         }
 
         body = safeStringify(wrappedBody);

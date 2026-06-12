@@ -266,9 +266,9 @@ export async function executeSearch(
     userAgent: "antigravity",
     requestId: generateRequestId(),
     enabledCreditTypes: ["GOOGLE_ONE_AI"],
+    sessionId: getSessionId(),
     request: {
       ...requestPayload,
-      sessionId: getSessionId(),
     },
   };
 
