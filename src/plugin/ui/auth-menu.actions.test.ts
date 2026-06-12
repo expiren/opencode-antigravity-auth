@@ -151,7 +151,7 @@ describe("showAccountDetails fingerprint restore", () => {
       email: "test@example.com",
       index: 0,
       fingerprintHistory: [
-        { fingerprint: { deviceId: "abcd1234efgh", userAgent: "ua1", sessionToken: "s", apiClient: "a", clientMetadata: { ideType: "t", platform: "p", pluginType: "t" }, createdAt: 0 }, timestamp: Date.now() - 86400000, reason: "regenerated" },
+        { fingerprint: { deviceId: "abcd1234efgh", userAgent: "ua1", sessionToken: "s", clientMetadata: { ideType: "t", platform: "p", pluginType: "t" }, createdAt: 0 }, timestamp: Date.now() - 86400000, reason: "regenerated" },
       ],
     })
 
@@ -202,8 +202,8 @@ describe("showFingerprintHistory", () => {
     const { showFingerprintHistory } = await import("./auth-menu.ts")
 
     await showFingerprintHistory([
-      { fingerprint: { deviceId: "abcdef1234567890", userAgent: "ua1", sessionToken: "s", apiClient: "a", clientMetadata: { ideType: "t", platform: "p", pluginType: "t" }, createdAt: 0 }, timestamp: Date.now() - 86400000, reason: "regenerated" },
-      { fingerprint: { deviceId: "12345678abcdefgh", userAgent: "ua2", sessionToken: "s", apiClient: "a", clientMetadata: { ideType: "t", platform: "p", pluginType: "t" }, createdAt: 0 }, timestamp: Date.now() - 172800000, reason: "initial" },
+      { fingerprint: { deviceId: "abcdef1234567890", userAgent: "ua1", sessionToken: "s", clientMetadata: { ideType: "t", platform: "p", pluginType: "t" }, createdAt: 0 }, timestamp: Date.now() - 86400000, reason: "regenerated" },
+      { fingerprint: { deviceId: "12345678abcdefgh", userAgent: "ua2", sessionToken: "s", clientMetadata: { ideType: "t", platform: "p", pluginType: "t" }, createdAt: 0 }, timestamp: Date.now() - 172800000, reason: "initial" },
     ], "test@example.com")
 
     const items = selectMock.mock.calls[0]?.[0] as Array<{ label: string; value: number | null }>
@@ -220,8 +220,8 @@ describe("showFingerprintHistory", () => {
     const { showFingerprintHistory } = await import("./auth-menu.ts")
 
     const result = await showFingerprintHistory([
-      { fingerprint: { deviceId: "abcdef1234567890", userAgent: "ua1", sessionToken: "s", apiClient: "a", clientMetadata: { ideType: "t", platform: "p", pluginType: "t" }, createdAt: 0 }, timestamp: Date.now(), reason: "regenerated" },
-      { fingerprint: { deviceId: "12345678abcdefgh", userAgent: "ua2", sessionToken: "s", apiClient: "a", clientMetadata: { ideType: "t", platform: "p", pluginType: "t" }, createdAt: 0 }, timestamp: Date.now(), reason: "initial" },
+      { fingerprint: { deviceId: "abcdef1234567890", userAgent: "ua1", sessionToken: "s", clientMetadata: { ideType: "t", platform: "p", pluginType: "t" }, createdAt: 0 }, timestamp: Date.now(), reason: "regenerated" },
+      { fingerprint: { deviceId: "12345678abcdefgh", userAgent: "ua2", sessionToken: "s", clientMetadata: { ideType: "t", platform: "p", pluginType: "t" }, createdAt: 0 }, timestamp: Date.now(), reason: "initial" },
     ], "test@example.com")
 
     expect(result).toBe(1)
@@ -232,7 +232,7 @@ describe("showFingerprintHistory", () => {
     const { showFingerprintHistory } = await import("./auth-menu.ts")
 
     const result = await showFingerprintHistory([
-      { fingerprint: { deviceId: "abcdef1234567890", userAgent: "ua1", sessionToken: "s", apiClient: "a", clientMetadata: { ideType: "t", platform: "p", pluginType: "t" }, createdAt: 0 }, timestamp: Date.now(), reason: "regenerated" },
+      { fingerprint: { deviceId: "abcdef1234567890", userAgent: "ua1", sessionToken: "s", clientMetadata: { ideType: "t", platform: "p", pluginType: "t" }, createdAt: 0 }, timestamp: Date.now(), reason: "regenerated" },
     ], "test@example.com")
 
     expect(result).toBeNull()
@@ -243,7 +243,7 @@ describe("showFingerprintHistory", () => {
     const { showFingerprintHistory } = await import("./auth-menu.ts")
 
     const result = await showFingerprintHistory([
-      { fingerprint: { deviceId: "abcdef1234567890", userAgent: "ua1", sessionToken: "s", apiClient: "a", clientMetadata: { ideType: "t", platform: "p", pluginType: "t" }, createdAt: 0 }, timestamp: Date.now(), reason: "regenerated" },
+      { fingerprint: { deviceId: "abcdef1234567890", userAgent: "ua1", sessionToken: "s", clientMetadata: { ideType: "t", platform: "p", pluginType: "t" }, createdAt: 0 }, timestamp: Date.now(), reason: "regenerated" },
     ], "test@example.com")
 
     expect(result).toBeNull()
@@ -254,7 +254,7 @@ describe("showFingerprintHistory", () => {
     const { showFingerprintHistory } = await import("./auth-menu.ts")
 
     await showFingerprintHistory([
-      { fingerprint: { deviceId: "abcdef1234567890", userAgent: "ua1", sessionToken: "s", apiClient: "a", clientMetadata: { ideType: "t", platform: "p", pluginType: "t" }, createdAt: 0 }, timestamp: Date.now(), reason: "regenerated" },
+      { fingerprint: { deviceId: "abcdef1234567890", userAgent: "ua1", sessionToken: "s", clientMetadata: { ideType: "t", platform: "p", pluginType: "t" }, createdAt: 0 }, timestamp: Date.now(), reason: "regenerated" },
     ], "test@example.com")
 
     const items = selectMock.mock.calls[0]?.[0] as Array<{ label: string; value: number | null; kind?: string }>
@@ -269,7 +269,7 @@ describe("showFingerprintHistory", () => {
     const { showFingerprintHistory } = await import("./auth-menu.ts")
 
     await showFingerprintHistory([
-      { fingerprint: { deviceId: "abcdef1234567890", userAgent: "ua1", sessionToken: "s", apiClient: "a", clientMetadata: { ideType: "t", platform: "p", pluginType: "t" }, createdAt: 0 }, timestamp: Date.now(), reason: "regenerated" },
+      { fingerprint: { deviceId: "abcdef1234567890", userAgent: "ua1", sessionToken: "s", clientMetadata: { ideType: "t", platform: "p", pluginType: "t" }, createdAt: 0 }, timestamp: Date.now(), reason: "regenerated" },
     ], "alice@example.com")
 
     const options = selectMock.mock.calls[0]?.[1] as { message: string }

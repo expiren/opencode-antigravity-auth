@@ -29,12 +29,6 @@ const PLATFORMS = [
   "MACOS",
 ] as const;
 
-const SDK_CLIENTS = [
-  "google-cloud-sdk vscode_cloudshelleditor/0.1",
-  "google-cloud-sdk vscode/1.86.0",
-  "google-cloud-sdk vscode/1.87.0",
-  "google-cloud-sdk vscode/1.96.0",
-];
 
 export interface ClientMetadata {
   ideType: string;
@@ -46,7 +40,6 @@ export interface Fingerprint {
   deviceId: string;
   sessionToken: string;
   userAgent: string;
-  apiClient: string;
   clientMetadata: ClientMetadata;
   createdAt: number;
 }
@@ -99,7 +92,6 @@ export function generateFingerprint(): Fingerprint {
     deviceId: generateDeviceId(),
     sessionToken: generateSessionToken(),
     userAgent: `antigravity/ide/${getAntigravityVersion()} ${platform}/${arch}`,
-    apiClient: randomFrom(SDK_CLIENTS),
     clientMetadata: {
       ideType: randomFrom(IDE_TYPES),
       platform: platformToDisplayName(platform),
@@ -124,7 +116,6 @@ export function collectCurrentFingerprint(): Fingerprint {
     deviceId: generateDeviceId(),
     sessionToken: generateSessionToken(),
     userAgent: `antigravity/ide/${getAntigravityVersion()} ${platform}/${arch}`,
-    apiClient: "google-cloud-sdk vscode_cloudshelleditor/0.1",
     clientMetadata: {
       ideType: "ANTIGRAVITY",
       platform: platformToDisplayName(platform),
