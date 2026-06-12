@@ -39,6 +39,7 @@ describe("OPENCODE_MODEL_DEFINITIONS", () => {
 
     expect(getModel("antigravity-gemini-3.5-flash").variants).toEqual({
       low: { thinkingLevel: "low" },
+      medium: { thinkingLevel: "medium" },
       high: { thinkingLevel: "high" },
     });
   });

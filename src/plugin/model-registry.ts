@@ -53,7 +53,7 @@ interface OpencodeModelDefinitionInput {
   variants?: Record<string, ModelVariant>
 }
 
-interface Gemini35FlashRouteMetadata {
+interface GeminiRouteMetadata {
   antigravity: {
     defaultModel: string
     byTier: Partial<Record<ThinkingTier, string>>
@@ -104,6 +104,7 @@ const PUBLIC_MODEL_DEFINITIONS: OpencodeModelDefinitions = {
     modalities: DEFAULT_MODALITIES,
     variants: {
       low: { thinkingLevel: "low" },
+      medium: { thinkingLevel: "medium" },
       high: { thinkingLevel: "high" },
     },
   }),
@@ -154,7 +155,7 @@ const PUBLIC_MODEL_DEFINITIONS: OpencodeModelDefinitions = {
   "gemini-2.5-pro": defineModel("gemini-2.5-pro", {
     name: "Gemini 2.5 Pro (Gemini CLI)",
     reasoning: true,
-    limit: { context: 1048576, output: 65536 },
+    limit: { context: 1048576, output: 65535 },
     modalities: DEFAULT_MODALITIES,
   }),
   "gemini-3-flash-preview": defineModel("gemini-3-flash-preview", {
@@ -219,16 +220,27 @@ const RESOLVER_ALIASES: Record<string, string> = {
   "gemini-claude-sonnet-4-6": "claude-sonnet-4-6-thinking",
 }
 
-const GEMINI_35_FLASH_ROUTES: Gemini35FlashRouteMetadata = {
+const GEMINI_35_FLASH_ROUTES: GeminiRouteMetadata = {
   antigravity: {
     defaultModel: "gemini-3-flash-agent",
     byTier: {
-      low: "gemini-3.5-flash-low",
+      low: "gemini-3.5-flash-extra-low",
       medium: "gemini-3.5-flash-low",
       high: "gemini-3-flash-agent",
     },
   },
   geminiCliFallbackModel: "gemini-3-flash-preview",
+}
+
+const GEMINI_31_PRO_ROUTES: GeminiRouteMetadata = {
+  antigravity: {
+    defaultModel: "gemini-3.1-pro-low",
+    byTier: {
+      low: "gemini-3.1-pro-low",
+      high: "gemini-pro-agent",
+    },
+  },
+  geminiCliFallbackModel: "gemini-3.1-pro-preview",
 }
 
 const QUOTA_GROUP_BY_MODEL_ID: Record<string, ModelQuotaGroup> = {
@@ -239,7 +251,6 @@ const QUOTA_GROUP_BY_MODEL_ID: Record<string, ModelQuotaGroup> = {
   "gemini-pro-agent": "gemini-pro",
   "gemini-3.1-pro": "gemini-pro",
   "gemini-3.1-pro-low": "gemini-pro",
-  "gemini-3.1-pro-high": "gemini-pro",
   "gemini-3-flash": "gemini-flash",
   "gemini-3-flash-agent": "gemini-flash",
   "gemini-3.5-flash-low": "gemini-flash",
@@ -250,6 +261,7 @@ const QUOTA_GROUP_BY_MODEL_ID: Record<string, ModelQuotaGroup> = {
   "gemini-2.5-flash-lite": "gemini-flash",
   "gemini-2.5-flash-thinking": "gemini-flash",
   "gemini-3.1-flash-lite": "gemini-flash",
+  "gemini-2.5-pro": "gemini-pro",
 }
 
 export const OPENCODE_MODEL_DEFINITIONS = PUBLIC_MODEL_DEFINITIONS
@@ -272,6 +284,13 @@ export function getGemini35FlashAntigravityModel(tier?: ThinkingTier): string {
 
 export function getGemini35FlashGeminiCliFallbackModel(): string {
   return GEMINI_35_FLASH_ROUTES.geminiCliFallbackModel
+}
+
+export function getGemini31ProAntigravityModel(tier?: ThinkingTier): string {
+  if (!tier) {
+    return GEMINI_31_PRO_ROUTES.antigravity.defaultModel
+  }
+  return GEMINI_31_PRO_ROUTES.antigravity.byTier[tier] ?? GEMINI_31_PRO_ROUTES.antigravity.defaultModel
 }
 
 export function getQuotaGroupForModel(modelId: string): ModelQuotaGroup | undefined {

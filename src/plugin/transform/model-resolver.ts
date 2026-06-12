@@ -6,6 +6,7 @@
  */
 
 import {
+  getGemini31ProAntigravityModel,
   getGemini35FlashAntigravityModel,
   getGemini35FlashGeminiCliFallbackModel,
   getResolverAliasMap,
@@ -136,6 +137,10 @@ function resolveGemini35FlashAntigravityModel(tier?: ThinkingTier): string {
   return getGemini35FlashAntigravityModel(tier);
 }
 
+function resolveGemini31ProAntigravityModel(tier?: ThinkingTier): string {
+  return getGemini31ProAntigravityModel(tier);
+}
+
 /**
  * Resolves a model name with optional tier suffix and quota prefix to its actual API model name
  * and corresponding thinking configuration.
@@ -185,6 +190,18 @@ export function resolveModelWithTier(requestedModel: string, options: ModelResol
     return {
       actualModel: resolveGemini35FlashAntigravityModel(tier),
       thinkingLevel: tier ?? "high",
+      tier,
+      isThinkingModel: true,
+      quotaPreference,
+      explicitQuota,
+    };
+  }
+
+  const isGemini31Pro = /^gemini-3\.1-pro(?!-preview)/i.test(baseName);
+  if (isGemini31Pro && quotaPreference === "antigravity") {
+    return {
+      actualModel: resolveGemini31ProAntigravityModel(tier),
+      thinkingLevel: tier ?? "low",
       tier,
       isThinkingModel: true,
       quotaPreference,
@@ -409,13 +426,19 @@ export function resolveModelWithVariant(
       .replace(TIER_REGEX, "");
     const isGemini35FlashAlias = isGemini35FlashModel(requestedBase) ||
       base.actualModel === "gemini-3-flash-agent" ||
-      base.actualModel === "gemini-3.5-flash-low";
+      base.actualModel === "gemini-3.5-flash-low" ||
+      base.actualModel === "gemini-3.5-flash-extra-low";
+    const isGemini31ProAlias = /^gemini-3\.1-pro(?!-preview)/i.test(requestedBase) ||
+      base.actualModel === "gemini-3.1-pro-low" ||
+      base.actualModel === "gemini-pro-agent";
     const isAntigravityGemini3WithTier = base.quotaPreference === "antigravity" &&
       (isGemini3ProModel(base.actualModel) || isGemini3FlashModel(base.actualModel));
 
     let actualModel = base.actualModel;
     if (isGemini35FlashAlias) {
       actualModel = resolveGemini35FlashAntigravityModel(level);
+    } else if (isGemini31ProAlias) {
+      actualModel = resolveGemini31ProAntigravityModel(level);
     } else if (isAntigravityGemini3WithTier) {
       const baseModel = base.actualModel.replace(/-(low|medium|high)$/, "");
       actualModel = `${baseModel}-${level}`;

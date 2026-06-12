@@ -74,6 +74,12 @@ const log = createLogger("request");
 
 const PLUGIN_SESSION_ID = `-${crypto.randomUUID()}`;
 
+// Structured requestId tracking — matches real Antigravity IDE format:
+// "agent/{conversationId}/{timestamp}/{trajectoryId}/{stepIndex}"
+const CONVERSATION_ID = crypto.randomUUID();
+const TRAJECTORY_ID = crypto.randomUUID();
+let requestStepIndex = 0;
+
 const sessionDisplayedThinkingHashes = new Set<string>();
 
 const MIN_SIGNATURE_LENGTH = 50;
@@ -1573,7 +1579,23 @@ export function prepareAntigravityRequest(
         if (headerStyle === "antigravity") {
           wrappedBody.requestType = "agent";
           wrappedBody.userAgent = "antigravity";
-          wrappedBody.requestId = "agent/" + crypto.randomUUID();
+          const timestamp = Date.now().toString();
+          wrappedBody.requestId = `agent/${CONVERSATION_ID}/${timestamp}/${TRAJECTORY_ID}/${requestStepIndex}`;
+          wrappedBody.labels = {
+            last_execution_id: CONVERSATION_ID,
+            last_step_index: String(requestStepIndex),
+            model_enum: "MODEL_PLACEHOLDER_M132",
+            trajectory_id: TRAJECTORY_ID,
+            used_claude: String(effectiveModel.startsWith("claude")),
+            used_claude_conservative: "false",
+          };
+          requestStepIndex++;
+          // Real IDE places generationConfig at envelope top level, not inside request.
+          // Moving it here matches the real Antigravity IDE envelope structure.
+          if (requestPayload.generationConfig != null) {
+            wrappedBody.generationConfig = requestPayload.generationConfig;
+            delete requestPayload.generationConfig;
+          }
         }
         if (wrappedBody.request && typeof wrappedBody.request === 'object') {
           // Use stable session ID for signature caching across multi-turn conversations

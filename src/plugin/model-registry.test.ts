@@ -53,7 +53,7 @@ describe("model registry", () => {
     expect(getGemini35FlashAntigravityModel()).toBe("gemini-3-flash-agent")
     expect(getGemini35FlashAntigravityModel("high")).toBe("gemini-3-flash-agent")
     expect(getGemini35FlashAntigravityModel("medium")).toBe("gemini-3.5-flash-low")
-    expect(getGemini35FlashAntigravityModel("low")).toBe("gemini-3.5-flash-low")
+    expect(getGemini35FlashAntigravityModel("low")).toBe("gemini-3.5-flash-extra-low")
     expect(getGemini35FlashGeminiCliFallbackModel()).toBe("gemini-3-flash-preview")
   })
 

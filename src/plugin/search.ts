@@ -98,8 +98,13 @@ export interface SearchResult {
 // Helper Functions
 // ============================================================================
 
+const SEARCH_CONVERSATION_ID = crypto.randomUUID();
+const SEARCH_TRAJECTORY_ID = crypto.randomUUID();
+let searchStepIndex = 0;
+
 function generateRequestId(): string {
-  return `search/${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+  const timestamp = Date.now().toString();
+  return `agent/${SEARCH_CONVERSATION_ID}/${timestamp}/${SEARCH_TRAJECTORY_ID}/${searchStepIndex++}`;
 }
 
 function formatSearchResult(result: SearchResult): string {
@@ -245,10 +250,6 @@ export async function executeSearch(
       },
     ],
     tools,
-    generationConfig: {
-      temperature: 0,
-      topP: 1,
-    },
   };
 
   // Wrap in Antigravity format
@@ -257,8 +258,14 @@ export async function executeSearch(
     model: SEARCH_MODEL,
     userAgent: "antigravity",
     requestId: generateRequestId(),
+    requestType: "agent",
     request: {
       ...requestPayload,
+    },
+    // Real IDE places generationConfig at envelope top level, not inside request
+    generationConfig: {
+      temperature: 0,
+      topP: 1,
     },
   };
 

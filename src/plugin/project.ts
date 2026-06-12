@@ -1,5 +1,5 @@
 import {
-  getAntigravityHeaders,
+  getContentRequestUserAgent,
   ANTIGRAVITY_ENDPOINT_FALLBACKS,
   ANTIGRAVITY_LOAD_ENDPOINTS,
   ANTIGRAVITY_DEFAULT_PROJECT_ID,
@@ -23,8 +23,6 @@ const projectContextPendingCache = new Map<string, Promise<ProjectContextResult>
 const provisionFailedKeys = new Set<string>();
 const CODE_ASSIST_METADATA = {
   ideType: "ANTIGRAVITY",
-  platform: process.platform === "win32" ? "WINDOWS" : "MACOS",
-  pluginType: "GEMINI",
 } as const;
 
 interface AntigravityUserTier {
@@ -50,16 +48,10 @@ interface OnboardUserPayload {
   };
 }
 
-function buildMetadata(projectId?: string): Record<string, string> {
-  const metadata: Record<string, string> = {
+function buildMetadata(): Record<string, string> {
+  return {
     ideType: CODE_ASSIST_METADATA.ideType,
-    platform: CODE_ASSIST_METADATA.platform,
-    pluginType: CODE_ASSIST_METADATA.pluginType,
   };
-  if (projectId) {
-    metadata.duetProject = projectId;
-  }
-  return metadata;
 }
 
 /**
@@ -136,16 +128,13 @@ export async function loadManagedProject(
   accessToken: string,
   projectId?: string,
 ): Promise<LoadCodeAssistPayload | null> {
-  const metadata = buildMetadata(projectId);
+  const metadata = buildMetadata();
   const requestBody: Record<string, unknown> = { metadata };
 
-  const antigravityHeaders = getAntigravityHeaders();
   const loadHeaders: Record<string, string> = {
     "Content-Type": "application/json",
     Authorization: `Bearer ${accessToken}`,
-    "User-Agent": antigravityHeaders["User-Agent"],
-    "X-Goog-Api-Client": antigravityHeaders["X-Goog-Api-Client"] ?? "",
-    "Client-Metadata": antigravityHeaders["Client-Metadata"],
+    "User-Agent": getContentRequestUserAgent(),
   };
 
   const loadEndpoints = Array.from(
@@ -204,7 +193,7 @@ export async function onboardManagedProject(
             headers: {
               "Content-Type": "application/json",
               Authorization: `Bearer ${accessToken}`,
-              ...getAntigravityHeaders(),
+              "User-Agent": getContentRequestUserAgent(),
             },
             body: JSON.stringify(requestBody),
           },
