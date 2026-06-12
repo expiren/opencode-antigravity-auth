@@ -48,3 +48,12 @@ opencode-better-antigravity-auth/
 
 # Magic Context historian XMLs (may contain secrets from conversation)
 .opencode/magic-context/historian/
+
+# MITM investigation artifacts
+extract_flows.py
+flows
+flows_export.txt
+realonewithchat
+with-message
+only-authentication
+gemini-cli

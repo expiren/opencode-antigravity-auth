@@ -1568,6 +1568,7 @@ export function prepareAntigravityRequest(
           project: effectiveProjectId,
           model: effectiveModel,
           request: requestPayload,
+          enabledCreditTypes: ["GOOGLE_ONE_AI"],
         };
 
         if (headerStyle === "antigravity") {
