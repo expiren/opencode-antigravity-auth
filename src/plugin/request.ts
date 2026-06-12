@@ -1594,32 +1594,40 @@ export function prepareAntigravityRequest(
       throw new Error("Failed to build Antigravity request body");
     }
   }
-  if (streaming) {
-    headers.set("Accept", "text/event-stream");
-  }
-
-  // NOTE: Real Antigravity IDE does NOT send anthropic-beta header.
-  // The proxy handles thinking configuration server-side.
-  // Removed to match real IDE behavior (Discrepancy 6).
-
   if (headerStyle === "antigravity") {
-    // Use randomized headers as the fallback pool for Antigravity mode
-    const selectedHeaders = getRandomizedHeaders("antigravity", requestedModel);
-
-    // Antigravity mode: Match Antigravity Manager behavior
-    // AM only sends User-Agent on content requests — no X-Goog-Api-Client, no Client-Metadata header
-    // (ideType=ANTIGRAVITY goes in request body metadata via project.ts, not as a header)
+    // Real Antigravity IDE content requests send ONLY these headers:
+    //   Host, User-Agent, Authorization, Content-Type, Transfer-Encoding, Accept-Encoding
+    // Host, Transfer-Encoding, and Accept-Encoding are auto-set by the fetch runtime.
+    // Strip ALL inherited OpenCode/AI SDK headers (x-session-affinity, x-parent-session-id,
+    // x-stainless-*, anthropic-version, Accept, etc.) to match real IDE signature exactly.
+    // The streaming format is signaled by ?alt=sse in the URL, not by Accept header.
     const fingerprint = options?.fingerprint ?? getSessionFingerprint();
     const fingerprintHeaders = buildFingerprintHeaders(fingerprint);
+    const selectedHeaders = getRandomizedHeaders("antigravity", requestedModel);
+    const cleanUA = fingerprintHeaders["User-Agent"] || selectedHeaders["User-Agent"];
+    const authValue = headers.get("Authorization");
 
-    headers.set("User-Agent", fingerprintHeaders["User-Agent"] || selectedHeaders["User-Agent"]);
+    // Clear all inherited headers and rebuild with only real-IDE-matching set
+    const keysToDelete: string[] = [];
+    headers.forEach((_value, key) => { keysToDelete.push(key); });
+    for (const key of keysToDelete) { headers.delete(key); }
+
+    if (authValue) headers.set("Authorization", authValue);
+    headers.set("Content-Type", "application/json");
+    headers.set("User-Agent", cleanUA);
   } else {
     // Gemini CLI mode: match official google-gemini/gemini-cli User-Agent format
+    // Accept: text/event-stream only for gemini-cli mode (antigravity uses ?alt=sse URL param)
+    if (streaming) {
+      headers.set("Accept", "text/event-stream");
+    }
     const geminiCliHeaders = getRandomizedHeaders("gemini-cli", requestedModel);
     headers.set("User-Agent", geminiCliHeaders["User-Agent"]);
     if (geminiCliHeaders["X-Goog-Api-Client"]) headers.set("X-Goog-Api-Client", geminiCliHeaders["X-Goog-Api-Client"]);
     if (geminiCliHeaders["Client-Metadata"]) headers.set("Client-Metadata", geminiCliHeaders["Client-Metadata"]);
-  }  return {
+  }
+
+  return {
     request: transformedUrl,
     init: {
       ...baseInit,
