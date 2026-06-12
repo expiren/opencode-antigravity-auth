@@ -1598,20 +1598,9 @@ export function prepareAntigravityRequest(
     headers.set("Accept", "text/event-stream");
   }
 
-  // Add interleaved thinking header for Claude thinking models
-  // This enables real-time streaming of thinking tokens
-  if (isClaudeThinking) {
-    const existing = headers.get("anthropic-beta");
-    const interleavedHeader = "interleaved-thinking-2025-05-14";
-
-    if (existing) {
-      if (!existing.includes(interleavedHeader)) {
-        headers.set("anthropic-beta", `${existing},${interleavedHeader}`);
-      }
-    } else {
-      headers.set("anthropic-beta", interleavedHeader);
-    }
-  }
+  // NOTE: Real Antigravity IDE does NOT send anthropic-beta header.
+  // The proxy handles thinking configuration server-side.
+  // Removed to match real IDE behavior (Discrepancy 6).
 
   if (headerStyle === "antigravity") {
     // Use randomized headers as the fallback pool for Antigravity mode
