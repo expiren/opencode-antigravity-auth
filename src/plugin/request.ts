@@ -74,6 +74,9 @@ const log = createLogger("request");
 
 const PLUGIN_SESSION_ID = `-${crypto.randomUUID()}`;
 
+// Stable numeric session ID for API envelope — matches real IDE format (negative 19-digit number)
+const PLUGIN_API_SESSION_ID = `-${Date.now()}${Math.floor(Math.random() * 1e6).toString().padStart(6, '0')}`;
+
 const sessionDisplayedThinkingHashes = new Set<string>();
 
 const MIN_SIGNATURE_LENGTH = 50;
@@ -954,11 +957,13 @@ export function prepareAntigravityRequest(
 
         if (requestObjects.length > 0) {
           sessionId = signatureSessionKey;
+          // sessionId at envelope top-level in numeric format (matches real IDE)
+          wrappedBody.sessionId = PLUGIN_API_SESSION_ID;
         }
 
         for (const req of requestObjects) {
-          // Use stable session ID for signature caching across multi-turn conversations
-          (req as any).sessionId = signatureSessionKey;
+          // Strip any nested sessionId — it belongs at the envelope top-level
+          delete (req as any).sessionId;
           stripInjectedDebugFromRequestPayload(req as Record<string, unknown>);
 
           if (isClaude) {
@@ -1580,7 +1585,7 @@ export function prepareAntigravityRequest(
           // Use stable session ID for signature caching across multi-turn conversations
           sessionId = signatureSessionKey;
           // sessionId goes at envelope top-level, not inside request (matches real IDE)
-          wrappedBody.sessionId = signatureSessionKey;
+          wrappedBody.sessionId = PLUGIN_API_SESSION_ID;
         }
 
         body = safeStringify(wrappedBody);
