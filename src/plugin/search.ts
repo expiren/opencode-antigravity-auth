@@ -8,7 +8,7 @@
 
 import {
   ANTIGRAVITY_ENDPOINT,
-  getAntigravityHeaders,
+  getContentRequestUserAgent,
   SEARCH_MODEL,
   SEARCH_TIMEOUT_MS,
   SEARCH_SYSTEM_INSTRUCTION,
@@ -284,9 +284,9 @@ export async function executeSearch(
     const response = await fetch(url, {
       method: "POST",
       headers: {
-        ...getAntigravityHeaders(),
         Authorization: `Bearer ${accessToken}`,
         "Content-Type": "application/json",
+        "User-Agent": getContentRequestUserAgent(),
       },
       body: JSON.stringify(wrappedBody),
       signal: abortSignal ?? AbortSignal.timeout(SEARCH_TIMEOUT_MS),

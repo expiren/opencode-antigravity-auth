@@ -5,7 +5,7 @@ import {
   ANTIGRAVITY_ENDPOINT_FALLBACKS,
   ANTIGRAVITY_ENDPOINT_PROD,
   ANTIGRAVITY_PROVIDER_ID,
-  getAntigravityHeaders,
+  getContentRequestUserAgent,
   type HeaderStyle,
 } from "./constants";
 import { authorizeAntigravity, exchangeAntigravity } from "./antigravity/oauth";
@@ -590,9 +590,9 @@ async function verifyAccountAccess(
     ANTIGRAVITY_DEFAULT_PROJECT_ID;
 
   const headers: Record<string, string> = {
-    ...getAntigravityHeaders(),
     Authorization: `Bearer ${refreshedAuth.access}`,
     "Content-Type": "application/json",
+    "User-Agent": getContentRequestUserAgent(),
   };
   if (projectId) {
     headers["x-goog-user-project"] = projectId;

@@ -87,17 +87,29 @@ export function setAntigravityVersion(version: string): void {
 export const ANTIGRAVITY_VERSION = ANTIGRAVITY_VERSION_FALLBACK;
 
 export function getAntigravityHeaders(): HeaderSet & { "Client-Metadata": string } {
+  const platform = process.platform === "win32" ? "windows" : process.platform;
+  const arch = process.arch === "x64" ? "amd64" : process.arch;
   return {
-    "User-Agent": `Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Antigravity/${getAntigravityVersion()} Chrome/138.0.7204.235 Electron/37.3.1 Safari/537.36`,
-    "X-Goog-Api-Client": "google-cloud-sdk vscode_cloudshelleditor/0.1",
+    "User-Agent": `antigravity/${getAntigravityVersion()} ${platform}/${arch} google-api-nodejs-client/10.3.0`,
+    "X-Goog-Api-Client": `gl-node/${process.versions.node}`,
     "Client-Metadata": `{"ideType":"ANTIGRAVITY","platform":"${process.platform === "win32" ? "WINDOWS" : "MACOS"}","pluginType":"GEMINI"}`,
   };
 }
 
+/**
+ * User-Agent for content/chat requests (streamGenerateContent, generateContent).
+ * Real Antigravity IDE uses a compact format without SDK client suffix on content requests.
+ */
+export function getContentRequestUserAgent(): string {
+  const platform = process.platform === "win32" ? "windows" : process.platform;
+  const arch = process.arch === "x64" ? "amd64" : process.arch;
+  return `antigravity/ide/${getAntigravityVersion()} ${platform}/${arch}`;
+}
+
 /** @deprecated Use getAntigravityHeaders() for runtime access. */
 export const ANTIGRAVITY_HEADERS = {
-  "User-Agent": `Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Antigravity/${ANTIGRAVITY_VERSION} Chrome/138.0.7204.235 Electron/37.3.1 Safari/537.36`,
-  "X-Goog-Api-Client": "google-cloud-sdk vscode_cloudshelleditor/0.1",
+  "User-Agent": `antigravity/${ANTIGRAVITY_VERSION} ${process.platform === "win32" ? "windows" : process.platform}/${process.arch === "x64" ? "amd64" : process.arch} google-api-nodejs-client/10.3.0`,
+  "X-Goog-Api-Client": `gl-node/${process.versions.node}`,
   "Client-Metadata": `{"ideType":"ANTIGRAVITY","platform":"${process.platform === "win32" ? "WINDOWS" : "MACOS"}","pluginType":"GEMINI"}`,
 } as const;
 
