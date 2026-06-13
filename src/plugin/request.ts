@@ -105,6 +105,19 @@ let NUMERIC_SESSION_ID = fnv1a64("")
 export function initSessionId(directory: string): void {
   NUMERIC_SESSION_ID = fnv1a64(directory)
 }
+
+// Per-model API ID mapping — real Antigravity API model IDs differ from our internal names.
+// Sonnet: claude-sonnet-4-6-thinking → claude-sonnet-4-6 (proxy strips -thinking server-side)
+// Opus:   claude-opus-4-6-thinking   → claude-opus-4-6-thinking (API requires the suffix)
+const CLAUDE_API_MODEL_IDS: Record<string, string> = {
+  "claude-sonnet-4-6-thinking": "claude-sonnet-4-6",
+  // Opus keeps the -thinking suffix — real API model ID includes it
+  "claude-opus-4-6-thinking": "claude-opus-4-6-thinking",
+}
+
+function toApiModelId(effectiveModel: string): string {
+  return CLAUDE_API_MODEL_IDS[effectiveModel] ?? effectiveModel;
+}
 let lastExecutionId = crypto.randomUUID()
 
 const sessionDisplayedThinkingHashes = new Set<string>();
@@ -962,7 +975,7 @@ export function prepareAntigravityRequest(
 
       if (isWrapped) {        const wrappedBody = {
           ...parsedBody,
-          model: effectiveModel.replace(/-thinking$/, ""),
+          model: toApiModelId(effectiveModel),
         } as Record<string, unknown>;
 
         // Some callers may already send an Antigravity-wrapped body.
@@ -1625,7 +1638,7 @@ export function prepareAntigravityRequest(
         // System instruction injection removed — CLIProxyAPI v6.9.x no longer injects it
         const wrappedBody: Record<string, unknown> = {
           project: effectiveProjectId,
-          model: effectiveModel.replace(/-thinking$/, ""),
+          model: toApiModelId(effectiveModel),
           request: requestPayload,
         };
 
