@@ -132,49 +132,49 @@ describe("configureClaudeToolConfig", () => {
 });
 
 describe("buildClaudeThinkingConfig", () => {
-  it("builds config with include_thoughts only", () => {
+  it("builds config with includeThoughts only", () => {
     const config = buildClaudeThinkingConfig(true);
     
-    expect(config).toEqual({ include_thoughts: true });
+    expect(config).toEqual({ includeThoughts: true });
   });
 
-  it("builds config with include_thoughts false", () => {
+  it("builds config with includeThoughts false", () => {
     const config = buildClaudeThinkingConfig(false);
     
-    expect(config).toEqual({ include_thoughts: false });
+    expect(config).toEqual({ includeThoughts: false });
   });
 
-  it("includes thinking_budget when provided and positive", () => {
+  it("includes thinkingBudget when provided and positive", () => {
     const config = buildClaudeThinkingConfig(true, 8192);
     
     expect(config).toEqual({
-      include_thoughts: true,
-      thinking_budget: 8192,
+      includeThoughts: true,
+      thinkingBudget: 8192,
     });
   });
 
-  it("excludes thinking_budget when zero", () => {
+  it("excludes thinkingBudget when zero", () => {
     const config = buildClaudeThinkingConfig(true, 0);
     
-    expect(config).toEqual({ include_thoughts: true });
+    expect(config).toEqual({ includeThoughts: true });
   });
 
-  it("excludes thinking_budget when negative", () => {
+  it("excludes thinkingBudget when negative", () => {
     const config = buildClaudeThinkingConfig(true, -100);
     
-    expect(config).toEqual({ include_thoughts: true });
+    expect(config).toEqual({ includeThoughts: true });
   });
 
-  it("excludes thinking_budget when undefined", () => {
+  it("excludes thinkingBudget when undefined", () => {
     const config = buildClaudeThinkingConfig(true, undefined);
     
-    expect(config).toEqual({ include_thoughts: true });
+    expect(config).toEqual({ includeThoughts: true });
   });
 
   it("handles various budget values", () => {
-    expect(buildClaudeThinkingConfig(true, 8192)).toHaveProperty("thinking_budget", 8192);
-    expect(buildClaudeThinkingConfig(true, 16384)).toHaveProperty("thinking_budget", 16384);
-    expect(buildClaudeThinkingConfig(true, 32768)).toHaveProperty("thinking_budget", 32768);
+    expect(buildClaudeThinkingConfig(true, 8192)).toHaveProperty("thinkingBudget", 8192);
+    expect(buildClaudeThinkingConfig(true, 16384)).toHaveProperty("thinkingBudget", 16384);
+    expect(buildClaudeThinkingConfig(true, 32768)).toHaveProperty("thinkingBudget", 32768);
   });
 });
 
@@ -720,8 +720,8 @@ describe("applyClaudeTransforms", () => {
     });
     
     const genConfig = payload.generationConfig as any;
-    expect(genConfig.thinkingConfig.include_thoughts).toBe(true);
-    expect(genConfig.thinkingConfig.thinking_budget).toBe(8192);
+    expect(genConfig.thinkingConfig.includeThoughts).toBe(true);
+    expect(genConfig.thinkingConfig.thinkingBudget).toBe(8192);
   });
 
   it("uses tierThinkingBudget over normalizedThinking.thinkingBudget", () => {
@@ -735,7 +735,7 @@ describe("applyClaudeTransforms", () => {
     });
     
     const genConfig = payload.generationConfig as any;
-    expect(genConfig.thinkingConfig.thinking_budget).toBe(32768);
+    expect(genConfig.thinkingConfig.thinkingBudget).toBe(32768);
   });
 
   it("ensures maxOutputTokens for thinking models with budget", () => {

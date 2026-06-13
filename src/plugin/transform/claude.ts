@@ -73,16 +73,16 @@ export function configureClaudeToolConfig(payload: RequestPayload): void {
 }
 
 /**
- * Build Claude thinking config with snake_case keys.
+ * Build Claude thinking config with camelCase keys (matching real Antigravity IDE format).
  */
 export function buildClaudeThinkingConfig(
   includeThoughts: boolean,
   thinkingBudget?: number,
 ): ThinkingConfig {
   return {
-    include_thoughts: includeThoughts,
+    includeThoughts,
     ...(typeof thinkingBudget === "number" && thinkingBudget > 0
-      ? { thinking_budget: thinkingBudget }
+      ? { thinkingBudget }
       : {}),
   } as unknown as ThinkingConfig;
 }

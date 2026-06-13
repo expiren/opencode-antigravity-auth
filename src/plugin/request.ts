@@ -476,8 +476,6 @@ function sanitizeRequestPayloadForAntigravity(payload: Record<string, unknown>, 
           }
           if (part.text !== undefined && (typeof part.text !== "string" || part.text.trim().length === 0)) {
             const sentinel: Record<string, unknown> = { text: emptyTextValue };
-            if (part.cache_control) sentinel.cache_control = part.cache_control;
-            if (part.cacheControl) sentinel.cacheControl = part.cacheControl;
             return sentinel;
           }
           return part;
@@ -499,7 +497,7 @@ function sanitizeRequestPayloadForAntigravity(payload: Record<string, unknown>, 
             }
 
             if (sig) {
-              return { ...part, thought_signature: sig, thoughtSignature: sig };
+              return { ...part, thoughtSignature: sig };
             }
             
             // If not the first part, just return the part without adding any signature keys
@@ -546,7 +544,6 @@ function sanitizeRequestPayloadForAntigravity(payload: Record<string, unknown>, 
           if (typeof text !== "string" || text.trim().length === 0) {
             const sentinelText = isClaudeRequest ? getClaudeSentinelText() : ""
             const sentinel: Record<string, unknown> = { type: "text", text: sentinelText }
-            if (blockRecord.cache_control !== undefined) sentinel.cache_control = blockRecord.cache_control
             return sentinel
           }
         }
@@ -575,7 +572,6 @@ function sanitizeRequestPayloadForAntigravity(payload: Record<string, unknown>, 
         if (isValidRequestPart(part)) return part;
         const record = part as Record<string, unknown>;
         const sentinel: Record<string, unknown> = { text: "" };
-        if (record?.cache_control !== undefined) sentinel.cache_control = record.cache_control;
         return sentinel;
       });
       const hasRealContent = sanitizedSystemParts.some((p: any) =>
@@ -1071,6 +1067,9 @@ export function prepareAntigravityRequest(
           requestPayload.providerOptions as Record<string, unknown> | undefined,
           rawGenerationConfig
         );
+        // Delete providerOptions — used for variant extraction above but must not leak to wire
+        // Real Antigravity IDE sends zero providerOptions fields
+        delete requestPayload.providerOptions;
         const isGemini3 = effectiveModel.toLowerCase().includes("gemini-3");
 
         log.debug(`[ThinkingResolution] rawModel=${rawModel} resolvedModel=${effectiveModel} resolvedTier=${tierThinkingLevel ?? "none"} variantLevel=${variantConfig?.thinkingLevel ?? "none"} variantBudget=${variantConfig?.thinkingBudget ?? "none"} providerOptions.google=${JSON.stringify((requestPayload.providerOptions as any)?.google ?? null)} generationConfig.thinkingConfig=${JSON.stringify((rawGenerationConfig as any)?.thinkingConfig ?? null)}`);
@@ -1181,11 +1180,11 @@ export function prepareAntigravityRequest(
             let thinkingConfig: Record<string, unknown>;
 
             if (isClaudeThinking) {
-              // Claude uses snake_case keys
+              // Claude uses camelCase keys (matching real Antigravity IDE format)
               thinkingConfig = {
-                include_thoughts: normalizedThinking.includeThoughts ?? true,
+                includeThoughts: normalizedThinking.includeThoughts ?? true,
                 ...(typeof thinkingBudget === "number" && thinkingBudget > 0
-                  ? { thinking_budget: thinkingBudget }
+                  ? { thinkingBudget }
                   : {}),
               };
             } else if (tierThinkingLevel) {
@@ -1242,23 +1241,10 @@ export function prepareAntigravityRequest(
           delete requestPayload.system_instruction;
         }
 
-        // Normalize cached_content → cachedContent (camelCase) but preserve the value.
-        // OpenCode uses cachedContent for prompt caching — deleting it busts cache.
-        const cachedContentFromExtra =
-          typeof requestPayload.extra_body === "object" && requestPayload.extra_body
-            ? (requestPayload.extra_body as Record<string, unknown>).cached_content ??
-            (requestPayload.extra_body as Record<string, unknown>).cachedContent
-            : undefined;
-        const cachedContent =
-          (requestPayload.cached_content as string | undefined) ??
-          (requestPayload.cachedContent as string | undefined) ??
-          (cachedContentFromExtra as string | undefined);
-        if (cachedContent) {
-          requestPayload.cachedContent = cachedContent;
-        }
-
-        // Only delete the snake_case duplicate — preserve camelCase
+        // Delete all cachedContent variants — real Antigravity IDE sends zero cachedContent
+        // The Antigravity proxy handles caching server-side via prefix matching
         delete requestPayload.cached_content;
+        delete requestPayload.cachedContent;
         if (requestPayload.extra_body && typeof requestPayload.extra_body === "object") {
           delete (requestPayload.extra_body as Record<string, unknown>).cached_content;
           delete (requestPayload.extra_body as Record<string, unknown>).cachedContent;
@@ -1739,8 +1725,8 @@ export function buildThinkingWarmupBody(
 
     const generationConfig = (req.generationConfig ?? {}) as Record<string, unknown>;
     generationConfig.thinkingConfig = {
-      include_thoughts: true,
-      thinking_budget: DEFAULT_THINKING_BUDGET,
+      includeThoughts: true,
+      thinkingBudget: DEFAULT_THINKING_BUDGET,
     };
     generationConfig.maxOutputTokens = computeClaudeMaxOutputTokens(DEFAULT_THINKING_BUDGET);
     req.generationConfig = generationConfig;  };
