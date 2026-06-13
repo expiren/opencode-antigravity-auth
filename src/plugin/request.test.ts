@@ -1190,7 +1190,7 @@ it("removes x-api-key header", () => {
         const wrapped = JSON.parse(result.init.body as string);
         expect(result.effectiveModel).toBe("gemini-3.5-flash-low");
         expect(wrapped.model).toBe("gemini-3.5-flash-low");
-        expect(wrapped.generationConfig.thinkingConfig.thinkingLevel).toBe("medium");
+        expect(wrapped.request.generationConfig.thinkingConfig.thinkingLevel).toBe("medium");
       });
 
       it("transforms gemini-3-flash to gemini-3-flash-preview for gemini-cli headerStyle", () => {

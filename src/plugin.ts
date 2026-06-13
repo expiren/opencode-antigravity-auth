@@ -30,6 +30,7 @@ import {
 import {
   buildThinkingWarmupBody,
   getLastCacheStats,
+  initSessionId,
   isGenerativeLanguageRequest,
   prepareAntigravityRequest,
   transformAntigravityResponse,
@@ -54,7 +55,7 @@ import { initDiskSignatureCache } from "./plugin/cache";import { createProactive
 import { initLogger, createLogger } from "./plugin/logger";
 import { initHealthTracker, getHealthTracker, initTokenTracker, getTokenTracker } from "./plugin/rotation";
 import { getAntigravityVersionResolution, initAntigravityVersion } from "./plugin/version";
-import { executeSearch } from "./plugin/search";
+import { executeSearch, initSearchSessionId } from "./plugin/search";
 import type {
   GetAuth,
   LoaderResult,
@@ -1334,6 +1335,10 @@ export const createAntigravityPlugin = (providerId: string) => async (
   // Load configuration from files and environment variables
   const config = loadConfig(directory);
   initRuntimeConfig(config);
+
+  // Initialize deterministic session IDs from workspace directory (FNV-1a hash)
+  initSessionId(directory);
+  initSearchSessionId(directory);
 
   // Cached getAuth function for tool access
   let cachedGetAuth: GetAuth | null = null;

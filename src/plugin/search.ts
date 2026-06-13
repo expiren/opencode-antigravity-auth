@@ -6,6 +6,8 @@
  * wrapper that makes separate API calls with only the grounding tools enabled.
  */
 
+import crypto from "node:crypto"
+
 import {
   ANTIGRAVITY_ENDPOINT,
   getContentRequestUserAgent,
@@ -101,6 +103,24 @@ export interface SearchResult {
 const SEARCH_CONVERSATION_ID = crypto.randomUUID();
 const SEARCH_TRAJECTORY_ID = crypto.randomUUID();
 let searchStepIndex = 0;
+// Deterministic session ID from workspace directory (FNV-1a 64-bit hash)
+// Shares the same hash algorithm as request.ts — initialized via initSearchSessionId()
+let SEARCH_NUMERIC_SESSION_ID = "-3750763034362895579" // FNV-1a("") default
+
+export function initSearchSessionId(directory: string): void {
+  const FNV1A_64_OFFSET_BASIS = 0xCBF29CE484222325n
+  const FNV1A_64_PRIME = 0x00000100000001B3n
+  let hash = FNV1A_64_OFFSET_BASIS
+  const bytes = Buffer.from(directory, "utf-8")
+  for (const byte of bytes) {
+    hash ^= BigInt(byte)
+    hash = BigInt.asUintN(64, hash * FNV1A_64_PRIME)
+  }
+  const signed = hash > 0x7FFFFFFFFFFFFFFFn
+    ? hash - 0x10000000000000000n
+    : hash
+  SEARCH_NUMERIC_SESSION_ID = signed.toString()
+}
 
 function generateRequestId(): string {
   const timestamp = Date.now().toString();
@@ -261,14 +281,13 @@ export async function executeSearch(
     requestType: "agent",
     request: {
       ...requestPayload,
-    },
-    // Real IDE places generationConfig at envelope top level, not inside request
-    generationConfig: {
-      temperature: 0,
-      topP: 1,
+      sessionId: SEARCH_NUMERIC_SESSION_ID,
+      generationConfig: {
+        temperature: 0,
+        topP: 1,
+      },
     },
   };
-
   // Use non-streaming endpoint for search
   const url = `${ANTIGRAVITY_ENDPOINT}/v1internal:generateContent`;
 

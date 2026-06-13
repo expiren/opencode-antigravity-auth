@@ -79,6 +79,33 @@ const PLUGIN_SESSION_ID = `-${crypto.randomUUID()}`;
 const CONVERSATION_ID = crypto.randomUUID();
 const TRAJECTORY_ID = crypto.randomUUID();
 let requestStepIndex = 0;
+// FNV-1a 64-bit hash — deterministic sessionId matching real Antigravity IDE
+// Real IDE computes FNV-1a(workspaceUri) — stable across accounts, restarts, conversations
+const FNV1A_64_OFFSET_BASIS = 0xCBF29CE484222325n
+const FNV1A_64_PRIME = 0x00000100000001B3n
+
+function fnv1a64(input: string): string {
+  let hash = FNV1A_64_OFFSET_BASIS
+  const bytes = Buffer.from(input, "utf-8")
+  for (const byte of bytes) {
+    hash ^= BigInt(byte)
+    hash = BigInt.asUintN(64, hash * FNV1A_64_PRIME)
+  }
+  // Convert to signed 64-bit integer string (matching real IDE format)
+  const signed = hash > 0x7FFFFFFFFFFFFFFFn
+    ? hash - 0x10000000000000000n
+    : hash
+  return signed.toString()
+}
+
+// Deterministic session ID from workspace directory (FNV-1a 64-bit hash)
+// Default: empty string input = FNV-1a offset basis = "-3750763034362895579"
+let NUMERIC_SESSION_ID = fnv1a64("")
+
+export function initSessionId(directory: string): void {
+  NUMERIC_SESSION_ID = fnv1a64(directory)
+}
+let lastExecutionId = crypto.randomUUID()
 
 const sessionDisplayedThinkingHashes = new Set<string>();
 
@@ -1566,6 +1593,32 @@ export function prepareAntigravityRequest(
 
         stripInjectedDebugFromRequestPayload(requestPayload);
         sanitizeRequestPayloadForAntigravity(requestPayload, isClaude);
+
+        // Inject fields inside request payload matching real Antigravity IDE format
+        // sessionId, labels, toolConfig go INSIDE request (not envelope top level)
+        if (headerStyle === "antigravity") {
+          // Session ID — stable signed integer string per plugin session
+          requestPayload.sessionId = NUMERIC_SESSION_ID
+
+          // Labels — tracking metadata for agent requests
+          const claudeUsed = isClaude ? "true" : "false"
+          requestPayload.labels = {
+            last_execution_id: lastExecutionId,
+            last_step_index: String(requestStepIndex),
+            model_enum: "MODEL_PLACEHOLDER_M132",
+            trajectory_id: TRAJECTORY_ID,
+            used_claude: claudeUsed,
+            used_claude_conservative: claudeUsed,
+          }
+          lastExecutionId = crypto.randomUUID()
+
+          // Tool config — only when function declarations are present
+          if (Array.isArray(requestPayload.tools) && requestPayload.tools.length > 0) {
+            requestPayload.toolConfig = {
+              functionCallingConfig: { mode: "VALIDATED" },
+            }
+          }
+        }
         const effectiveProjectId = projectId?.trim() || "";
         resolvedProjectId = effectiveProjectId;
 
@@ -1581,21 +1634,7 @@ export function prepareAntigravityRequest(
           wrappedBody.userAgent = "antigravity";
           const timestamp = Date.now().toString();
           wrappedBody.requestId = `agent/${CONVERSATION_ID}/${timestamp}/${TRAJECTORY_ID}/${requestStepIndex}`;
-          wrappedBody.labels = {
-            last_execution_id: CONVERSATION_ID,
-            last_step_index: String(requestStepIndex),
-            model_enum: "MODEL_PLACEHOLDER_M132",
-            trajectory_id: TRAJECTORY_ID,
-            used_claude: String(effectiveModel.startsWith("claude")),
-            used_claude_conservative: "false",
-          };
           requestStepIndex++;
-          // Real IDE places generationConfig at envelope top level, not inside request.
-          // Moving it here matches the real Antigravity IDE envelope structure.
-          if (requestPayload.generationConfig != null) {
-            wrappedBody.generationConfig = requestPayload.generationConfig;
-            delete requestPayload.generationConfig;
-          }
         }
         if (wrappedBody.request && typeof wrappedBody.request === 'object') {
           // Use stable session ID for signature caching across multi-turn conversations
