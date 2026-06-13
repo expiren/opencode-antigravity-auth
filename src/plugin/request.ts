@@ -962,7 +962,7 @@ export function prepareAntigravityRequest(
 
       if (isWrapped) {        const wrappedBody = {
           ...parsedBody,
-          model: effectiveModel,
+          model: effectiveModel.replace(/-thinking$/, ""),
         } as Record<string, unknown>;
 
         // Some callers may already send an Antigravity-wrapped body.
@@ -1625,7 +1625,7 @@ export function prepareAntigravityRequest(
         // System instruction injection removed — CLIProxyAPI v6.9.x no longer injects it
         const wrappedBody: Record<string, unknown> = {
           project: effectiveProjectId,
-          model: effectiveModel,
+          model: effectiveModel.replace(/-thinking$/, ""),
           request: requestPayload,
         };
 
