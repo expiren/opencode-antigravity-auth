@@ -1,5 +1,6 @@
 import {
-  getContentRequestUserAgent,
+  getAntigravityHeaders,
+  getAntigravityVersion,
   ANTIGRAVITY_ENDPOINT_FALLBACKS,
   ANTIGRAVITY_LOAD_ENDPOINTS,
   ANTIGRAVITY_DEFAULT_PROJECT_ID,
@@ -134,7 +135,7 @@ export async function loadManagedProject(
   const loadHeaders: Record<string, string> = {
     "Content-Type": "application/json",
     Authorization: `Bearer ${accessToken}`,
-    "User-Agent": getContentRequestUserAgent(),
+    ...getAntigravityHeaders(),
   };
 
   const loadEndpoints = Array.from(
@@ -177,10 +178,14 @@ export async function onboardManagedProject(
   attempts = 10,
   delayMs = 5000,
 ): Promise<string | undefined> {
-  // Only send tierId — metadata causes onboarding failures on some endpoints.
-  // Matches the minimal body used by working onboarding scripts.
+  // Match real Antigravity IDE onboardUser body format (snake_case keys).
   const requestBody: Record<string, unknown> = {
-    tierId,
+    tier_id: tierId,
+    metadata: {
+      ide_type: "ANTIGRAVITY",
+      ide_version: getAntigravityVersion(),
+      ide_name: "antigravity",
+    },
   };
   // Use prod-first order for onboarding — daily sandbox often rejects non-dev accounts.
   for (const baseEndpoint of ANTIGRAVITY_LOAD_ENDPOINTS) {
@@ -193,7 +198,7 @@ export async function onboardManagedProject(
             headers: {
               "Content-Type": "application/json",
               Authorization: `Bearer ${accessToken}`,
-              "User-Agent": getContentRequestUserAgent(),
+              ...getAntigravityHeaders(),
             },
             body: JSON.stringify(requestBody),
           },

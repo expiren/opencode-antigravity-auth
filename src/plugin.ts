@@ -2190,6 +2190,7 @@ if (toastScope === "root_only" && getIsChildSession()) {
             if (account.fingerprint) {
               pushDebug(`fingerprint: deviceId=${account.fingerprint.deviceId.slice(0, 8)}...`);
             }
+            pushDebug(`project=${projectContext.effectiveProjectId}`);
             
             // Check if this header style is rate-limited for this account
             if (accountManager.isRateLimitedForHeaderStyle(account, family, headerStyle, model)) {
