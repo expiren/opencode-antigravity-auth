@@ -31,6 +31,7 @@ import {
   buildThinkingWarmupBody,
   getLastCacheStats,
   initSessionId,
+  fetchInputToUrl,
   isGenerativeLanguageRequest,
   prepareAntigravityRequest,
   transformAntigravityResponse,
@@ -1657,7 +1658,7 @@ export const createAntigravityPlugin = (providerId: string) => async (
               "unknown",
             );
           }
-          const urlString = toUrlString(input);
+          const urlString = fetchInputToUrl(input);
           const family = getModelFamilyFromUrl(urlString);
           const model = extractModelFromUrl(urlString);
 
@@ -1710,6 +1711,7 @@ export const createAntigravityPlugin = (providerId: string) => async (
           let lastFailure: FailureContext | null = null;
           let lastError: Error | null = null;
           const abortSignal = init?.signal ?? undefined;
+          const responseTimeoutMs = (config.response_timeout_seconds ?? 180) * 1000;
 
           // Helper to check if request was aborted
           const checkAborted = () => {
@@ -1983,11 +1985,6 @@ if (toastScope === "root_only" && getIsChildSession()) {
                   const removed = accountManager.removeAccount(account);
                   if (removed) {
                     log.warn("Removed revoked account from pool - reauthenticate via `opencode auth login`");
-                    try {
-                      await accountManager.saveToDisk();
-                    } catch (persistError) {
-                      log.error("Failed to persist revoked account removal", { error: String(persistError) });
-                    }
                   }
 
                   if (accountManager.getAccountCount() === 0) {
@@ -2144,7 +2141,7 @@ if (toastScope === "root_only" && getIsChildSession()) {
                 // produces a different hash → cache MISS on the first real request.
                 // The probe aborts after the first SSE chunk, so output generation
                 // cost is negligible regardless of maxOutputTokens settings.
-                const probeResponse = await fetch(toUrlString(prepared.request), {
+                const probeResponse = await fetch(fetchInputToUrl(prepared.request), {
                   ...prepared.init,
                   method: "POST",
                   body: bodyStr,
@@ -2294,8 +2291,8 @@ if (toastScope === "root_only" && getIsChildSession()) {
                   },
                 );
 
-                const originalUrl = toUrlString(input);
-                const resolvedUrl = toUrlString(prepared.request);
+                const originalUrl = fetchInputToUrl(input);
+                const resolvedUrl = fetchInputToUrl(prepared.request);
                 pushDebug(`endpoint=${currentEndpoint}`);
                 pushDebug(`resolved=${resolvedUrl}`);
                 const debugContext = startAntigravityDebugRequest({
@@ -2339,7 +2336,13 @@ if (toastScope === "root_only" && getIsChildSession()) {
                   tokenConsumed = getTokenTracker().consume(account.index);
                 }
 
-                const response = await fetch(prepared.request, prepared.init);
+                // Compose timeout signal with caller's abort signal
+                const timeoutSignal = AbortSignal.timeout(responseTimeoutMs);
+                const composedSignal = abortSignal
+                  ? AbortSignal.any([abortSignal, timeoutSignal])
+                  : timeoutSignal;
+                const fetchInit = { ...prepared.init, signal: composedSignal };
+                const response = await fetch(prepared.request, fetchInit);
                 apiRequestCount++;
                 accountManager.recordRequest(account.index, family)
                 const requestCounts = accountManager.getDailyRequestCounts(account.index)
@@ -2375,6 +2378,7 @@ if (toastScope === "root_only" && getIsChildSession()) {
                      // force account switch instead of looping forever
                      if (totalCapacityRetries >= MAX_TOTAL_CAPACITY_RETRIES) {
                        pushDebug(`Total capacity retries (${MAX_TOTAL_CAPACITY_RETRIES}) exhausted, switching account`);
+                       lastFailure = createFailureContext(response);
                        shouldSwitchAccount = true;
                        break;
                      }
@@ -3847,19 +3851,9 @@ if (toastScope === "root_only" && getIsChildSession()) {
 export const AntigravityCLIOAuthPlugin = createAntigravityPlugin(ANTIGRAVITY_PROVIDER_ID);
 export const GoogleOAuthPlugin = AntigravityCLIOAuthPlugin;
 
-function toUrlString(value: RequestInfo): string {
-  if (typeof value === "string") {
-    return value;
-  }
-  const candidate = (value as Request).url;
-  if (candidate) {
-    return candidate;
-  }
-  return value.toString();
-}
 
 function toWarmupStreamUrl(value: RequestInfo): string {
-  const urlString = toUrlString(value);
+  const urlString = fetchInputToUrl(value);
   try {
     const url = new URL(urlString);
     if (!url.pathname.includes(":streamGenerateContent")) {

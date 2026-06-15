@@ -63,3 +63,5 @@ only-authentication
 with-message
 flows
 flows_export.txt
+.sisyphus/
+graphify-out/

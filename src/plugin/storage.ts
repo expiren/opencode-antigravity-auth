@@ -408,6 +408,12 @@ async function withFileLock<T>(path: string, fn: () => Promise<T>): Promise<T> {
   let release: (() => Promise<void>) | null = null;
   try {
     release = await lockfile.lock(path, LOCK_OPTIONS);
+  } catch (lockError) {
+    // Lock contention: another OpenCode instance holds the lock.
+    // Proceed without lock — graceful degradation is better than crashing.
+    log.warn("Lock contention, proceeding without lock", { error: String(lockError) });
+  }
+  try {
     return await fn();
   } finally {
     if (release) {
@@ -823,9 +829,13 @@ async function loadAccountsUnsafe(): Promise<AccountStorageV4 | null> {
   }
 }
 export async function clearAccounts(): Promise<void> {
+  const path = getStoragePath();
   try {
-    const path = getStoragePath();
-    await fs.unlink(path);
+    // Acquire the file lock so a concurrent debounced save can't write state
+    // back in between (which would resurrect a just-cleared pool).
+    await withFileLock(path, async () => {
+      await fs.unlink(path);
+    });
   } catch (error) {
     const code = (error as NodeJS.ErrnoException).code;
     if (code !== "ENOENT") {

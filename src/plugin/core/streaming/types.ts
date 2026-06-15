@@ -15,6 +15,7 @@ export interface StreamingUsageMetadata {
   promptTokenCount: number;
   candidatesTokenCount: number;
   totalTokenCount: number;
+  thoughtsTokenCount: number;
 }
 
 export interface StreamingCallbacks {

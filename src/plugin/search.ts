@@ -16,6 +16,7 @@ import {
   SEARCH_SYSTEM_INSTRUCTION,
 } from "../constants";
 import { createLogger } from "./logger";
+import { orderAntigravityEnvelope } from "./request";
 
 const log = createLogger("search");
 
@@ -305,7 +306,7 @@ export async function executeSearch(
         "Content-Type": "application/json",
         "User-Agent": getContentRequestUserAgent(),
       },
-      body: JSON.stringify(wrappedBody),
+      body: JSON.stringify(orderAntigravityEnvelope(wrappedBody as Record<string, unknown>)),
       signal: abortSignal ?? AbortSignal.timeout(SEARCH_TIMEOUT_MS),
     });
 

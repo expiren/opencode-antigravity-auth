@@ -51,7 +51,7 @@ function getLogsDir(customLogDir?: string): string {
   const logsDir = customLogDir || join(getConfigDir(), "antigravity-logs");
 
   try {
-    mkdirSync(logsDir, { recursive: true });
+    mkdirSync(logsDir, { recursive: true, mode: 0o700 });
   } catch {
     // Directory may already exist or we don't have permission
   }
@@ -110,7 +110,7 @@ function createLogWriter(filePath?: string): (line: string) => void {
   }
 
   try {
-    const stream = createWriteStream(filePath, { flags: "a" });
+    const stream = createWriteStream(filePath, { flags: "a", mode: 0o600 });
     stream.on("error", () => {});
     return (line: string) => {
       const timestamp = new Date().toISOString();

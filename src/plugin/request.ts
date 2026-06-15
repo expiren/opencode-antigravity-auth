@@ -118,6 +118,67 @@ const CLAUDE_API_MODEL_IDS: Record<string, string> = {
 function toApiModelId(effectiveModel: string): string {
   return CLAUDE_API_MODEL_IDS[effectiveModel] ?? effectiveModel;
 }
+
+// Deterministic envelope field ordering — matches real Antigravity IDE JSON key order
+// for byte-for-byte prefix cache stability
+const ANTIGRAVITY_ENVELOPE_FIELD_ORDER = [
+  "project",
+  "requestId",
+  "request",
+  "model",
+  "userAgent",
+  "requestType",
+] as const
+
+export function orderAntigravityEnvelope(body: Record<string, unknown>): Record<string, unknown> {
+  const ordered: Record<string, unknown> = {}
+  const remaining = new Set(Object.keys(body))
+
+  for (const key of ANTIGRAVITY_ENVELOPE_FIELD_ORDER) {
+    if (key in body) {
+      ordered[key] = body[key]
+      remaining.delete(key)
+    }
+  }
+
+  for (const key of remaining) {
+    ordered[key] = body[key]
+  }
+
+  return ordered
+}
+
+// Per-model maxOutputTokens from real Antigravity fetchAvailableModels API
+// Ensures generationConfig.maxOutputTokens matches API-reported limits
+const AGY_MAX_OUTPUT_TOKENS: Record<string, number> = {
+  "gemini-3.5-flash-low": 65536,
+  "gemini-3.5-flash-extra-low": 65536,
+  "gemini-3-flash-agent": 65536,
+  "gemini-3.1-pro-low": 65535,
+  "gemini-pro-agent": 65535,
+  "claude-sonnet-4-6": 64000,
+  "claude-opus-4-6-thinking": 64000,
+  "gpt-oss-120b": 32768,
+  "gpt-oss-120b-medium": 32768,
+  "gemini-3.1-flash-image": 33000,
+  "gemini-3.1-flash-lite": 65536,
+}
+
+function applyAgyGenerationDefaults(model: string, requestPayload: Record<string, unknown>, headerStyle: string): void {
+  if (headerStyle !== "antigravity") {
+    return
+  }
+  const maxOutput = AGY_MAX_OUTPUT_TOKENS[model.toLowerCase()]
+  if (maxOutput === undefined) {
+    return
+  }
+  const gen = requestPayload.generationConfig as Record<string, unknown> | undefined
+  if (!gen || typeof gen !== "object") {
+    return
+  }
+  gen.maxOutputTokens = maxOutput
+  delete gen.max_output_tokens
+}
 let lastExecutionId = crypto.randomUUID()
 
 const sessionDisplayedThinkingHashes = new Set<string>();
@@ -858,10 +919,24 @@ export function getLastCacheStats(family?: string) {
 const STREAM_ACTION = "streamGenerateContent";
 
 /**
- * Detects requests headed to the Google Generative Language API so we can intercept them.
+ * Extract a URL string from any fetch() input shape (string, URL, or Request).
  */
-export function isGenerativeLanguageRequest(input: RequestInfo): input is string {
-  return typeof input === "string" && input.includes("generativelanguage.googleapis.com");
+export function fetchInputToUrl(input: RequestInfo | URL): string {
+  if (typeof input === "string") return input
+  if (input instanceof URL) return input.href
+  // Request-like object
+  const url = (input as Request).url
+  return typeof url === "string" ? url : String(input)
+}
+
+/**
+ * Detects requests headed to the Google Generative Language API so we can
+ * intercept them. Handles string, URL, and Request inputs — matching on URL
+ * only would let `fetch(new Request(...))` / `fetch(new URL(...))` bypass the
+ * interceptor entirely.
+ */
+export function isGenerativeLanguageRequest(input: RequestInfo | URL): boolean {
+  return fetchInputToUrl(input).includes("generativelanguage.googleapis.com")
 }
 
 /**
@@ -929,7 +1004,8 @@ export function prepareAntigravityRequest(
   // that are not required for Antigravity/Gemini CLI OAuth requests.
   headers.delete("x-goog-user-project");
 
-  const match = input.match(/\/models\/([^:]+):(\w+)/);
+  const inputUrl = fetchInputToUrl(input);
+  const match = inputUrl.match(/\/models\/([^:]+):(\w+)/);
   if (!match) {
     return {
       request: input,
@@ -1592,6 +1668,7 @@ export function prepareAntigravityRequest(
 
         stripInjectedDebugFromRequestPayload(requestPayload);
         sanitizeRequestPayloadForAntigravity(requestPayload, isClaude);
+        applyAgyGenerationDefaults(effectiveModel, requestPayload, headerStyle);
 
         // Inject fields inside request payload matching real Antigravity IDE format
         // sessionId, labels, toolConfig go INSIDE request (not envelope top level)
@@ -1640,7 +1717,7 @@ export function prepareAntigravityRequest(
           sessionId = signatureSessionKey;
         }
 
-        body = safeStringify(wrappedBody);
+        body = safeStringify(headerStyle === "antigravity" ? orderAntigravityEnvelope(wrappedBody) : wrappedBody);
       }
     } catch {
       throw new Error("Failed to build Antigravity request body");
@@ -1808,8 +1885,13 @@ export async function transformAntigravityResponse(
             const totalInput = usage.promptTokenCount ?? usage.totalTokenCount
             const hitRate = totalInput > 0 ? Math.round((cacheRead / totalInput) * 100) : 0
             const status = cacheRead > 0 ? "HIT" : "MISS"
+            const thinkingTokens = usage.thoughtsTokenCount ?? 0
+            const outputTokens = (usage.candidatesTokenCount ?? 0) + thinkingTokens
             logCacheStats(effectiveModel, cacheRead, 0, totalInput);
             log.debug(`[Cache] ${status} model=${effectiveModel} read=${cacheRead} total=${totalInput} hitRate=${hitRate}%`)
+            if (thinkingTokens > 0) {
+              log.debug(`[Usage] model=${effectiveModel} output=${outputTokens} (candidates=${usage.candidatesTokenCount ?? 0} thinking=${thinkingTokens})`)
+            }
             const statsFamily = effectiveModel.includes("claude") ? "claude" : "gemini"
             _lastCacheStatsByFamily[statsFamily] = { model: effectiveModel, read: cacheRead, total: totalInput, hitRate }
           }
@@ -1930,10 +2012,15 @@ export async function transformAntigravityResponse(
       const totalInput = usage.promptTokenCount ?? usage.totalTokenCount ?? 0
       const hitRate = totalInput > 0 ? Math.round((cacheRead / totalInput) * 100) : 0
       const status = cacheRead > 0 ? "HIT" : "MISS"
+      const thinkingTokens = usage.thoughtsTokenCount ?? 0
+      const outputTokens = (usage.candidatesTokenCount ?? 0) + thinkingTokens
       const statsFamily = effectiveModel.includes("claude") ? "claude" : "gemini"
       _lastCacheStatsByFamily[statsFamily] = { model: effectiveModel, read: cacheRead, total: totalInput, hitRate }
       logCacheStats(effectiveModel, cacheRead, 0, totalInput);
       log.debug(`[Cache] ${status} model=${effectiveModel} read=${cacheRead} total=${totalInput} hitRate=${hitRate}%`)
+      if (thinkingTokens > 0) {
+        log.debug(`[Usage] model=${effectiveModel} output=${outputTokens} (candidates=${usage.candidatesTokenCount ?? 0} thinking=${thinkingTokens})`)
+      }
     }    
     if (usage?.cachedContentTokenCount !== undefined) {
       headers.set("x-antigravity-cached-content-token-count", String(usage.cachedContentTokenCount));
@@ -1945,6 +2032,9 @@ export async function transformAntigravityResponse(
       }
       if (usage.candidatesTokenCount !== undefined) {
         headers.set("x-antigravity-candidates-token-count", String(usage.candidatesTokenCount));
+      }
+      if (usage.thoughtsTokenCount !== undefined && usage.thoughtsTokenCount > 0) {
+        headers.set("x-antigravity-thoughts-token-count", String(usage.thoughtsTokenCount));
       }
     }
 

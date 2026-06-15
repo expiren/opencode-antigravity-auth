@@ -426,6 +426,15 @@ export const AntigravityConfigSchema = z.object({
     * @default 500
     */
    switch_account_delay_ms: z.number().min(0).max(10000).default(500),
+
+   /**
+    * Maximum time in seconds to wait for an API response before aborting.
+    * Prevents hanging requests from blocking the session indefinitely.
+    * The timeout applies per individual fetch call, not the entire retry loop.
+    * 
+    * @default 180
+    */
+   response_timeout_seconds: z.number().min(30).max(600).default(180),
    
    /**
     * Soft quota threshold percentage (1-100).
@@ -572,6 +581,7 @@ export const DEFAULT_CONFIG: AntigravityConfig = {
   soft_quota_cache_ttl_minutes: "auto",
   proactive_rotation_threshold_percent: 20,
   claude_thinking_sentinel: "dot",
+  response_timeout_seconds: 180,
   auto_update: true,  signature_cache: {
     enabled: true,
     memory_ttl_seconds: 3600,

@@ -32,6 +32,7 @@ export function transformStreamingPayload(
   transformThinkingParts?: (response: unknown) => unknown,
 ): string {
   return payload
+    .replace(/\r\n/g, '\n').replace(/\r/g, '\n')
     .split('\n')
     .map((line) => {
       if (!line.startsWith('data:')) {
@@ -209,6 +210,7 @@ export function transformSseLine(
             promptTokenCount: typeof meta.promptTokenCount === "number" ? meta.promptTokenCount : 0,
             candidatesTokenCount: typeof meta.candidatesTokenCount === "number" ? meta.candidatesTokenCount : 0,
             totalTokenCount: typeof meta.totalTokenCount === "number" ? meta.totalTokenCount : 0,
+            thoughtsTokenCount: typeof meta.thoughtsTokenCount === "number" ? meta.thoughtsTokenCount : 0,
           };
         }
       }
@@ -315,6 +317,9 @@ export function createStreamingTransformer(
   return new TransformStream({
     transform(chunk, controller) {
       buffer += decoder.decode(chunk, { stream: true });
+
+      // Normalize CRLF to LF — Antigravity proxy may send \r\n frame separators
+      buffer = buffer.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
 
       const lines = buffer.split('\n');
       buffer = lines.pop() || '';

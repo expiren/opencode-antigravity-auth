@@ -1,5 +1,5 @@
 import { formatRefreshParts, parseRefreshParts } from "./auth";
-import { loadAccounts, saveAccounts, type AccountStorageV4, type AccountMetadataV3, type RateLimitStateV3, type ModelFamily, type HeaderStyle, type CooldownReason } from "./storage";
+import { loadAccounts, saveAccounts, saveAccountsReplace, type AccountStorageV4, type AccountMetadataV3, type RateLimitStateV3, type ModelFamily, type HeaderStyle, type CooldownReason } from "./storage";
 import type { OAuthAuthDetails, RefreshParts } from "./types";
 import type { AccountSelectionStrategy } from "./config/schema";
 import { getHealthTracker, getTokenTracker, selectHybridAccount, type AccountWithMetrics } from "./rotation";
@@ -1117,6 +1117,7 @@ export class AccountManager {
       shiftIndexSet(state.usedAccounts);
     }
 
+    void this.saveToDiskReplace();
     return true;
   }
 
@@ -1222,6 +1223,47 @@ export class AccountManager {
 
     await saveAccounts(storage);
   }
+
+  /**
+   * Save to disk using full replacement (no merge).
+   * Use after removeAccount to prevent deleted accounts from being resurrected
+   * by the merge logic in saveAccounts.
+   */
+  async saveToDiskReplace(): Promise<void> {
+    const claudeIndex = Math.max(0, this.currentAccountIndexByFamily.claude);
+    const geminiIndex = Math.max(0, this.currentAccountIndexByFamily.gemini);
+
+    const storage: AccountStorageV4 = {
+      version: 4,
+      accounts: this.accounts.map((a) => ({
+        email: a.email,
+        refreshToken: a.parts.refreshToken,
+        projectId: a.parts.projectId,
+        managedProjectId: a.parts.managedProjectId,
+        addedAt: a.addedAt,
+        lastUsed: a.lastUsed,
+        enabled: a.enabled,
+        rateLimitResetTimes: Object.keys(a.rateLimitResetTimes).length > 0 ? a.rateLimitResetTimes : undefined,
+        fingerprint: a.fingerprint,
+        fingerprintHistory: a.fingerprintHistory?.length ? a.fingerprintHistory : undefined,
+        cachedQuota: a.cachedQuota && Object.keys(a.cachedQuota).length > 0 ? a.cachedQuota : undefined,
+        cachedQuotaUpdatedAt: a.cachedQuotaUpdatedAt,
+        dailyRequestCounts: a.dailyRequestCounts,
+        verificationRequired: a.verificationRequired,
+        verificationRequiredAt: a.verificationRequiredAt,
+        verificationRequiredReason: a.verificationRequiredReason,
+        verificationUrl: a.verificationUrl,
+      })),
+      activeIndex: claudeIndex,
+      activeIndexByFamily: {
+        claude: claudeIndex,
+        gemini: geminiIndex,
+      },
+    };
+
+    await saveAccountsReplace(storage);
+  }
+
 
   requestSaveToDisk(): void {
     if (this.savePending) {
