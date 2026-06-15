@@ -17,6 +17,8 @@ import {
 } from "../constants";
 import { createLogger } from "./logger";
 import { orderAntigravityEnvelope } from "./request";
+import { fetchWithRawTransport } from "./transport";
+import { getUseRawTransport } from "./config";
 
 const log = createLogger("search");
 
@@ -299,7 +301,7 @@ export async function executeSearch(
   });
 
   try {
-    const response = await fetch(url, {
+    const fetchInit = {
       method: "POST",
       headers: {
         Authorization: `Bearer ${accessToken}`,
@@ -308,7 +310,10 @@ export async function executeSearch(
       },
       body: JSON.stringify(orderAntigravityEnvelope(wrappedBody as Record<string, unknown>)),
       signal: abortSignal ?? AbortSignal.timeout(SEARCH_TIMEOUT_MS),
-    });
+    };
+    const response = getUseRawTransport()
+      ? await fetchWithRawTransport(url, fetchInit, { timeoutMs: SEARCH_TIMEOUT_MS })
+      : await fetch(url, fetchInit);
 
     if (!response.ok) {
       const errorText = await response.text();

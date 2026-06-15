@@ -1,6 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { executeSearch } from "./search";
 
+// Force tests to use standard fetch (not raw transport)
+vi.mock("./config", () => ({
+  getUseRawTransport: () => false,
+}));
+
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function makeResponse(

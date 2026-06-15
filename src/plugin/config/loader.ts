@@ -183,3 +183,11 @@ export function getClaudeSentinelText(): string {
   const raw = runtimeConfig?.claude_thinking_sentinel ?? "dot"
   return SENTINEL_PRESETS[raw] ?? raw
 }
+
+export function getUseRawTransport(): boolean {
+  return runtimeConfig?.use_raw_transport ?? true;
+}
+
+export function getResponseTimeoutMs(): number {
+  return (runtimeConfig?.response_timeout_seconds ?? 180) * 1000;
+}

@@ -435,6 +435,19 @@ export const AntigravityConfigSchema = z.object({
     * @default 180
     */
    response_timeout_seconds: z.number().min(30).max(600).default(180),
+
+   /**
+    * Use raw TLS socket transport instead of Node.js fetch() for Antigravity API requests.
+    * Gives byte-level control over HTTP/1.1 header ordering and serialization,
+    * matching the real Antigravity IDE wire format exactly. Also provides native
+    * HTTPS CONNECT proxy support via standard env vars (HTTPS_PROXY, NO_PROXY).
+    *
+    * Set to false to fall back to standard fetch() if raw transport causes issues.
+    *
+    * @default true
+    * @env OPENCODE_ANTIGRAVITY_USE_RAW_TRANSPORT
+    */
+   use_raw_transport: z.boolean().default(true),
    
    /**
     * Soft quota threshold percentage (1-100).
@@ -582,6 +595,7 @@ export const DEFAULT_CONFIG: AntigravityConfig = {
   proactive_rotation_threshold_percent: 20,
   claude_thinking_sentinel: "dot",
   response_timeout_seconds: 180,
+  use_raw_transport: true,
   auto_update: true,  signature_cache: {
     enabled: true,
     memory_ttl_seconds: 3600,

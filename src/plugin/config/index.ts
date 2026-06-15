@@ -29,4 +29,6 @@ export {
   initRuntimeConfig,
   getKeepThinking,
   getClaudeSentinelText,
+  getUseRawTransport,
+  getResponseTimeoutMs,
 } from "./loader";

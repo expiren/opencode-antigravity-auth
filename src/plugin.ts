@@ -48,7 +48,7 @@ import { AccountManager, type ModelFamily, parseRateLimitReason, calculateBackof
 import { createAutoUpdateCheckerHook } from "./hooks/auto-update-checker";
 import { buildAuthFromStoredAccount, detectAuthStorageDrift } from "./plugin/auth-drift";
 import { createAuthDoctorReport, formatAuthDoctorReport } from "./plugin/auth-doctor";
-import { loadConfig, initRuntimeConfig, type AntigravityConfig } from "./plugin/config";
+import { loadConfig, initRuntimeConfig, getUseRawTransport, getResponseTimeoutMs, type AntigravityConfig } from "./plugin/config";
 import { createSessionRecoveryHook, getRecoverySuccessToast } from "./plugin/recovery";
 import { checkAccountsQuota } from "./plugin/quota";
 import { formatCachedQuotaWithStatus, classifyGroupStatus, formatQuotaStatusBadge } from "./plugin/ui/quota-status";
@@ -57,6 +57,7 @@ import { initLogger, createLogger } from "./plugin/logger";
 import { initHealthTracker, getHealthTracker, initTokenTracker, getTokenTracker } from "./plugin/rotation";
 import { getAntigravityVersionResolution, initAntigravityVersion } from "./plugin/version";
 import { executeSearch, initSearchSessionId } from "./plugin/search";
+import { fetchWithRawTransport } from "./plugin/transport";
 import type {
   GetAuth,
   LoaderResult,
@@ -2101,7 +2102,9 @@ if (toastScope === "root_only" && getIsChildSession()) {
 
               try {
                 pushDebug("thinking-warmup: start");
-                const warmupResponse = await fetch(warmupUrl, warmupInit);
+                const warmupResponse = getUseRawTransport()
+                  ? await fetchWithRawTransport(warmupUrl, warmupInit, { timeoutMs: responseTimeoutMs })
+                  : await fetch(warmupUrl, warmupInit);
                 const transformed = await transformAntigravityResponse(
                   warmupResponse,
                   true,
@@ -2141,11 +2144,17 @@ if (toastScope === "root_only" && getIsChildSession()) {
                 // produces a different hash → cache MISS on the first real request.
                 // The probe aborts after the first SSE chunk, so output generation
                 // cost is negligible regardless of maxOutputTokens settings.
-                const probeResponse = await fetch(fetchInputToUrl(prepared.request), {
-                  ...prepared.init,
-                  method: "POST",
-                  body: bodyStr,
-                });
+                const probeResponse = getUseRawTransport()
+                  ? await fetchWithRawTransport(fetchInputToUrl(prepared.request), {
+                      ...prepared.init,
+                      method: "POST",
+                      body: bodyStr,
+                    }, { timeoutMs: responseTimeoutMs })
+                  : await fetch(fetchInputToUrl(prepared.request), {
+                      ...prepared.init,
+                      method: "POST",
+                      body: bodyStr,
+                    });
 
                 if (probeResponse.body) {
                   const reader = probeResponse.body.getReader();
@@ -2342,7 +2351,11 @@ if (toastScope === "root_only" && getIsChildSession()) {
                   ? AbortSignal.any([abortSignal, timeoutSignal])
                   : timeoutSignal;
                 const fetchInit = { ...prepared.init, signal: composedSignal };
-                const response = await fetch(prepared.request, fetchInit);
+                const response = getUseRawTransport() && headerStyle === "antigravity"
+                  ? await fetchWithRawTransport(fetchInputToUrl(prepared.request), fetchInit, {
+                      timeoutMs: responseTimeoutMs,
+                    })
+                  : await fetch(prepared.request, fetchInit);
                 apiRequestCount++;
                 accountManager.recordRequest(account.index, family)
                 const requestCounts = accountManager.getDailyRequestCounts(account.index)
