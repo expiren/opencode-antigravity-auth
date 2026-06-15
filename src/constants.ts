@@ -26,10 +26,9 @@ export const ANTIGRAVITY_REDIRECT_URI = "http://localhost:51121/oauth-callback";
 
 /**
  * Root endpoints for the Antigravity API (in fallback order).
- * CLIProxy and Vibeproxy use the daily sandbox endpoint first,
- * then fallback to autopush and prod if needed.
+ * Real agy CLI 1.0.4 traffic uses daily-cloudcode-pa.googleapis.com.
  */
-export const ANTIGRAVITY_ENDPOINT_DAILY = "https://daily-cloudcode-pa.sandbox.googleapis.com";
+export const ANTIGRAVITY_ENDPOINT_DAILY = "https://daily-cloudcode-pa.googleapis.com";
 export const ANTIGRAVITY_ENDPOINT_AUTOPUSH = "https://autopush-cloudcode-pa.sandbox.googleapis.com";
 export const ANTIGRAVITY_ENDPOINT_PROD = "https://cloudcode-pa.googleapis.com";
 
@@ -51,7 +50,7 @@ export const ANTIGRAVITY_LOAD_ENDPOINTS = [
   ANTIGRAVITY_ENDPOINT_DAILY,
 ] as const;
 /**
- * Primary endpoint to use (daily sandbox - same as CLIProxy/Vibeproxy).
+ * Primary endpoint to use (daily — same as real agy CLI).
  */
 export const ANTIGRAVITY_ENDPOINT = ANTIGRAVITY_ENDPOINT_DAILY;
 

@@ -376,6 +376,21 @@ export function createStreamingTransformer(
         controller.enqueue(encoder.encode(`\ndata: ${JSON.stringify(syntheticUsage)}\n\n`));
       }
 
+      // Emit a final SSE frame with finishReason=STOP so OpenCode
+      // cleanly closes the response instead of relying on TCP close
+      const stopFrame = {
+        response: {
+          candidates: [{
+            content: { parts: [], role: "model" },
+            finishReason: "STOP",
+          }],
+        },
+      };
+      controller.enqueue(encoder.encode(`
+data: ${JSON.stringify(stopFrame)}
+
+`));
+
       if (usageState.lastUsage && callbacks.onUsageMetadata) {
         callbacks.onUsageMetadata(usageState.lastUsage);
       }
