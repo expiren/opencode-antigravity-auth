@@ -1363,12 +1363,28 @@ export class AccountManager {
    * Used when quota API confirms remaining capacity, contradicting
    * the persisted lockout timestamps.
    */
-  clearRateLimitsForAccount(accountIndex: number): void {
+  clearRateLimitsForAccount(accountIndex: number, family?: string): void {
     const account = this.accounts[accountIndex];
     if (!account) return;
-    account.rateLimitResetTimes = {};
-    account.coolingDownUntil = undefined;
-    account.cooldownReason = undefined;
+    if (family) {
+      // Only clear rate limits matching this family
+      const newResetTimes: Record<string, number> = {};
+      for (const [key, value] of Object.entries(account.rateLimitResetTimes ?? {})) {
+        if (!key.toLowerCase().includes(family.toLowerCase())) {
+          newResetTimes[key] = value!;
+        }
+      }
+      account.rateLimitResetTimes = newResetTimes;
+      // Only clear cooldown if it matches the family
+      if (account.cooldownReason?.toLowerCase().includes(family.toLowerCase())) {
+        account.coolingDownUntil = undefined;
+        account.cooldownReason = undefined;
+      }
+    } else {
+      account.rateLimitResetTimes = {};
+      account.coolingDownUntil = undefined;
+      account.cooldownReason = undefined;
+    }
   }
 
   /**

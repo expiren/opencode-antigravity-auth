@@ -582,7 +582,7 @@ function sanitizeRequestPayloadForAntigravity(payload: Record<string, unknown>, 
         });
 
         if (sanitizedParts.length === 0) {
-          return { ...contentRecord, parts: [{ text: "" }] };
+          return { ...contentRecord, parts: [{ text: isClaudeRequest ? getClaudeSentinelText() : "" }] };
         }
 
         return {
@@ -624,7 +624,7 @@ function sanitizeRequestPayloadForAntigravity(payload: Record<string, unknown>, 
       })
 
       if (sanitizedContent.length === 0) {
-        return { ...messageRecord, content: [{ type: "text", text: "" }] }
+        return { ...messageRecord, content: [{ type: "text", text: isClaudeRequest ? getClaudeSentinelText() : "" }] }
       }
 
       return {
@@ -1151,7 +1151,7 @@ export function prepareAntigravityRequest(
               const messages = (req as any).messages;
               const lastMessage = messages[messages.length - 1];
               if (lastMessage?.role === "model" || lastMessage?.role === "assistant") {
-                messages.push({ role: "user", parts: [{ text: "[Continue]" }] });
+                messages.push({ role: "user", content: [{ type: "text", text: "[Continue]" }] });
               }
             }
           }
@@ -1442,7 +1442,9 @@ export function prepareAntigravityRequest(
                   `tool-${functionDeclarations.length}`;
 
                 // Sanitize tool name: must be alphanumeric with underscores, no special chars
-                name = String(name).replace(/[^a-zA-Z0-9_-]/g, "_").slice(0, 64);
+                name = String(name).replace(/[^a-zA-Z0-9_]/g, "_");
+                if (name.length > 0 && !/^[A-Za-z_]/.test(name)) { name = "_" + name; }
+                name = name.slice(0, 64);
 
                 const description =
                   decl?.description ||
@@ -1687,7 +1689,7 @@ export function prepareAntigravityRequest(
           if (Array.isArray(requestPayload.messages)) {
             const lastMessage = (requestPayload.messages as any[])[requestPayload.messages.length - 1];
             if (lastMessage?.role === "model" || lastMessage?.role === "assistant") {
-              (requestPayload.messages as any[]).push({ role: "user", parts: [{ text: "[Continue]" }] });
+              (requestPayload.messages as any[]).push({ role: "user", content: [{ type: "text", text: "[Continue]" }] });
             }
           }
         }

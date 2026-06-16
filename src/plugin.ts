@@ -1421,6 +1421,8 @@ export const createAntigravityPlugin = (providerId: string) => async (
           }
         }
         activeChildSessionIds.clear();
+        // Reset fleet quota refresh flag so the next session triggers a fresh fleet refresh
+        fleetQuotaRefreshedThisSession = false;
         log.debug("root-session-detected", { activeChildren: 0 });
       }
     }

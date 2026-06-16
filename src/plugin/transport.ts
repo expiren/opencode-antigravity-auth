@@ -358,6 +358,10 @@ class ChunkedDecodeStream extends Transform {
       const chunkEnd = chunkStart + size
       const nextOffset = chunkEnd + 2
       if (this.buffer.length < nextOffset) return
+      // Validate trailing CRLF after chunk data
+      if (this.buffer[chunkEnd] !== 0x0d || this.buffer[chunkEnd + 1] !== 0x0a) {
+        throw new Error(`Expected CRLF after chunk data at offset ${chunkEnd}, got 0x${this.buffer[chunkEnd]?.toString(16)}${this.buffer[chunkEnd + 1]?.toString(16)}`)
+      }
       if (size === 0) {
         this.buffer = Buffer.alloc(0)
         this.push(null)
@@ -444,9 +448,12 @@ function buildResponseStream(
   if (head.chunked) {
     responseBody = responseBody.pipe(new ChunkedDecodeStream())
   } else if (typeof head.contentLength === "number") {
-    // Non-chunked with known length: emit exactly contentLength bytes
-    // then end, rather than reading until socket EOF.
-    responseBody = responseBody.pipe(new ContentLengthStream(head.contentLength))
+    if (head.contentLength === 0) {
+      // Zero-length body: push EOF immediately instead of piping
+      source.end()
+    } else {
+      responseBody = responseBody.pipe(new ContentLengthStream(head.contentLength))
+    }
   }
   if (head.gzip) {
     responseBody = responseBody.pipe(createGunzip())

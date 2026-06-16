@@ -43,6 +43,7 @@ export const DEFAULT_PROACTIVE_REFRESH_CONFIG: ProactiveRefreshConfig = {
 interface RefreshQueueState {
   isRunning: boolean;
   intervalHandle: ReturnType<typeof setInterval> | null;
+  initialTimeoutHandle: ReturnType<typeof setTimeout> | null;
   isRefreshing: boolean;
   lastCheckTime: number;
   lastRefreshTime: number;
@@ -67,6 +68,7 @@ export class ProactiveRefreshQueue {
   private state: RefreshQueueState = {
     isRunning: false,
     intervalHandle: null,
+    initialTimeoutHandle: null,
     isRefreshing: false,
     lastCheckTime: 0,
     lastRefreshTime: 0,
@@ -248,7 +250,8 @@ export class ProactiveRefreshQueue {
     });
 
     // Run initial check after a short delay (let things settle)
-    setTimeout(() => {
+    this.state.initialTimeoutHandle = setTimeout(() => {
+      this.state.initialTimeoutHandle = null;
       if (this.state.isRunning) {
         this.runRefreshCheck().catch((error) => {
           log.error("Initial check failed", {
@@ -281,6 +284,10 @@ export class ProactiveRefreshQueue {
     if (this.state.intervalHandle) {
       clearInterval(this.state.intervalHandle);
       this.state.intervalHandle = null;
+    }
+    if (this.state.initialTimeoutHandle) {
+      clearTimeout(this.state.initialTimeoutHandle);
+      this.state.initialTimeoutHandle = null;
     }
 
     log.debug("Stopped proactive refresh queue", {
