@@ -6,8 +6,11 @@ import {
   EMPTY_SCHEMA_PLACEHOLDER_DESCRIPTION,
   SKIP_THOUGHT_SIGNATURE,
   getRandomizedHeaders,
+  CLAUDE_TOOL_SYSTEM_INSTRUCTION,
+  CLAUDE_DESCRIPTION_PROMPT,
   type HeaderStyle,
-} from "../constants";import { cacheSignature, getCachedSignature } from "./cache";
+} from "../constants"
+import { cacheSignature, getCachedSignature } from "./cache"
 import { getKeepThinking, getClaudeSentinelText } from "./config";
 import {
   createStreamingTransformer,
@@ -17,7 +20,6 @@ import {
 import { defaultSignatureStore } from "./stores/signature-store";
 import {
   DEBUG_MESSAGE_PREFIX,
-  isDebugEnabled,
   isDebugTuiEnabled,
   logAntigravityDebugResponse,
   logCacheStats,
@@ -46,45 +48,54 @@ import {
   type AntigravityApiBody,
 } from "./request-helpers";
 import {
-  CLAUDE_TOOL_SYSTEM_INSTRUCTION,
-  CLAUDE_DESCRIPTION_PROMPT,
-} from "../constants";
-import {
   analyzeConversationState,
   closeToolLoopForThinking,
   needsThinkingRecovery,
 } from "./thinking-recovery";
-import { sanitizeCrossModelPayloadInPlace } from "./transform/cross-model-sanitizer";
-import { isGemini3Model, isImageGenerationModel, buildImageGenerationConfig, applyGeminiTransforms } from "./transform";
 import {
-  resolveModelWithTier,
-  resolveModelWithVariant,
+  isGemini3Model,
+  isImageGenerationModel,
+  buildImageGenerationConfig,
+  applyGeminiTransforms,
   resolveModelForHeaderStyle,
   isClaudeModel,
   isClaudeThinkingModel,
-  CLAUDE_THINKING_MAX_OUTPUT_TOKENS,
   computeClaudeMaxOutputTokens,
+  ensureClaudeMaxOutputTokens,
+  sanitizeCrossModelPayloadInPlace,
   type ThinkingTier,
+  type GoogleSearchConfig,
   appendClaudeThinkingHint,
-} from "./transform";import { detectErrorType } from "./recovery";
+} from "./transform"
+import { detectErrorType } from "./recovery"
 import { getSessionFingerprint, buildFingerprintHeaders, type Fingerprint } from "./fingerprint";
-import type { GoogleSearchConfig } from "./transform/types";
 
 const log = createLogger("request");
 
 const PLUGIN_SESSION_ID = `-${crypto.randomUUID()}`;
 
 // Structured requestId tracking — matches real Antigravity IDE format:
-// "agent/{conversationId}/{timestamp}/{trajectoryId}/{stepIndex}"
+// Checkpoint: "checkpoint/{uuid}"
+// Agent:      "agent/{conversationId}/{timestamp}/{trajectoryId}/{stepIndex}"
 const CONVERSATION_ID = crypto.randomUUID();
 const TRAJECTORY_ID = crypto.randomUUID();
 let requestStepIndex = 0;
+
+export function buildAntigravityRequestId(type: "agent" | "checkpoint" = "agent"): string {
+  if (type === "checkpoint") {
+    return `checkpoint/${crypto.randomUUID()}`;
+  }
+  const timestamp = Date.now().toString();
+  const id = `agent/${CONVERSATION_ID}/${timestamp}/${TRAJECTORY_ID}/${requestStepIndex}`;
+  requestStepIndex++;
+  return id;
+}
 // FNV-1a 64-bit hash — deterministic sessionId matching real Antigravity IDE
 // Real IDE computes FNV-1a(workspaceUri) — stable across accounts, restarts, conversations
 const FNV1A_64_OFFSET_BASIS = 0xCBF29CE484222325n
 const FNV1A_64_PRIME = 0x00000100000001B3n
 
-function fnv1a64(input: string): string {
+export function fnv1a64(input: string): string {
   let hash = FNV1A_64_OFFSET_BASIS
   const bytes = Buffer.from(input, "utf-8")
   for (const byte of bytes) {
@@ -631,8 +642,11 @@ function sanitizeRequestPayloadForAntigravity(payload: Record<string, unknown>, 
       // and prevent prompt cache invalidation from index shifts.
       const sanitizedSystemParts = sys.parts.map((part: unknown) => {
         if (isValidRequestPart(part)) return part;
-        const record = part as Record<string, unknown>;
         const sentinel: Record<string, unknown> = { text: "" };
+        if (part && typeof part === "object") {
+          const cc = (part as Record<string, unknown>).cache_control;
+          if (cc !== undefined) sentinel.cache_control = cc;
+        }
         return sentinel;
       });
       const hasRealContent = sanitizedSystemParts.some((p: any) =>
@@ -834,13 +848,25 @@ function hasToolUseInContents(contents: any[]): boolean {
   });
 }
 
-function hasSignedThinkingInContents(contents: any[], sessionId?: string): boolean {
-  return contents.some((content: any) => {
-    if (!content || typeof content !== "object" || !Array.isArray(content.parts)) {
-      return false;
+function hasSignedThinkingInItems(
+  items: any[],
+  innerArrayKey: string,
+  sessionId?: string,
+): boolean {
+  return items.some((item: any) => {
+    if (!item || typeof item !== "object" || !Array.isArray(item[innerArrayKey])) {
+      return false
     }
-    return (content.parts as any[]).some((part) => hasSignedThinkingPart(part, sessionId));
-  });
+    return (item[innerArrayKey] as any[]).some((part) => hasSignedThinkingPart(part, sessionId))
+  })
+}
+
+function hasSignedThinkingInContents(contents: any[], sessionId?: string): boolean {
+  return hasSignedThinkingInItems(contents, "parts", sessionId)
+}
+
+function hasSignedThinkingInMessages(messages: any[], sessionId?: string): boolean {
+  return hasSignedThinkingInItems(messages, "content", sessionId)
 }
 
 function hasToolUseInMessages(messages: any[]): boolean {
@@ -851,15 +877,6 @@ function hasToolUseInMessages(messages: any[]): boolean {
     return (message.content as any[]).some(
       (block) => block && typeof block === "object" && (block.type === "tool_use" || block.type === "tool_result"),
     );
-  });
-}
-
-function hasSignedThinkingInMessages(messages: any[], sessionId?: string): boolean {
-  return messages.some((message: any) => {
-    if (!message || typeof message !== "object" || !Array.isArray(message.content)) {
-      return false;
-    }
-    return (message.content as any[]).some((block) => hasSignedThinkingPart(block, sessionId));
   });
 }
 
@@ -895,7 +912,6 @@ function ensureThinkingBeforeToolUseInMessages(messages: any[], signatureSession
     log.debug("Replacing thinking with sentinels in-place (Messages format)", { signatureSessionKey, hasCachedSig: !!lastThinking });
     return { ...message, content: blocks.map((b) => {
       if (!isThinkingBlock(b)) return b;
-      const thinkingText = lastThinking ? lastThinking.text : (typeof b.thinking === "string" ? b.thinking : typeof b.text === "string" ? b.text : "");
       const cc = (b as Record<string, unknown>).cache_control;
       const sentinel: Record<string, unknown> = { text: getClaudeSentinelText() };
       if (cc) sentinel.cache_control = cc;
@@ -915,6 +931,26 @@ const _lastCacheStatsByFamily: Record<string, { model: string; read: number; tot
 export function getLastCacheStats(family?: string) {
   if (!family) return null
   return _lastCacheStatsByFamily[family] ?? null
+}
+
+/** Shared cache/usage stats logging for both streaming and non-streaming paths. */
+function recordUsageStats(
+  usage: { cachedContentTokenCount?: number; promptTokenCount?: number; totalTokenCount?: number; candidatesTokenCount?: number; thoughtsTokenCount?: number },
+  model: string,
+): void {
+  const cacheRead = usage.cachedContentTokenCount ?? 0
+  const totalInput = usage.promptTokenCount ?? usage.totalTokenCount ?? 0
+  const hitRate = totalInput > 0 ? Math.round((cacheRead / totalInput) * 100) : 0
+  const status = cacheRead > 0 ? "HIT" : "MISS"
+  const thinkingTokens = usage.thoughtsTokenCount ?? 0
+  const outputTokens = (usage.candidatesTokenCount ?? 0) + thinkingTokens
+  const statsFamily = model.includes("claude") ? "claude" : "gemini"
+  _lastCacheStatsByFamily[statsFamily] = { model, read: cacheRead, total: totalInput, hitRate }
+  logCacheStats(model, cacheRead, 0, totalInput);
+  log.debug(`[Cache] ${status} model=${model} read=${cacheRead} total=${totalInput} hitRate=${hitRate}%`)
+  if (thinkingTokens > 0) {
+    log.debug(`[Usage] model=${model} output=${outputTokens} (candidates=${usage.candidatesTokenCount ?? 0} thinking=${thinkingTokens})`)
+  }
 }
 const STREAM_ACTION = "streamGenerateContent";
 
@@ -1182,12 +1218,12 @@ export function prepareAntigravityRequest(
           if (!requestPayload.toolConfig) {
             requestPayload.toolConfig = {};
           }
-          if (typeof requestPayload.toolConfig === "object" && requestPayload.toolConfig !== null) {
+          if (typeof requestPayload.toolConfig === "object") {
             const toolConfig = requestPayload.toolConfig as Record<string, unknown>;
             if (!toolConfig.functionCallingConfig) {
               toolConfig.functionCallingConfig = {};
             }
-            if (typeof toolConfig.functionCallingConfig === "object" && toolConfig.functionCallingConfig !== null) {
+            if (typeof toolConfig.functionCallingConfig === "object") {
               (toolConfig.functionCallingConfig as Record<string, unknown>).mode = "VALIDATED";
             }
           }
@@ -1281,13 +1317,7 @@ export function prepareAntigravityRequest(
               rawGenerationConfig.thinkingConfig = thinkingConfig;
 
               if (isClaudeThinking && typeof thinkingBudget === "number" && thinkingBudget > 0) {
-                const currentMax = (rawGenerationConfig.maxOutputTokens ?? rawGenerationConfig.max_output_tokens) as number | undefined;
-                if (!currentMax || currentMax <= thinkingBudget) {
-                  rawGenerationConfig.maxOutputTokens = computeClaudeMaxOutputTokens(thinkingBudget);
-                  if (rawGenerationConfig.max_output_tokens !== undefined) {
-                    delete rawGenerationConfig.max_output_tokens;
-                  }
-                }
+                ensureClaudeMaxOutputTokens(rawGenerationConfig, thinkingBudget);
               }
               requestPayload.generationConfig = rawGenerationConfig;
             } else {
@@ -1708,9 +1738,7 @@ export function prepareAntigravityRequest(
         if (headerStyle === "antigravity") {
           wrappedBody.requestType = "agent";
           wrappedBody.userAgent = "antigravity";
-          const timestamp = Date.now().toString();
-          wrappedBody.requestId = `agent/${CONVERSATION_ID}/${timestamp}/${TRAJECTORY_ID}/${requestStepIndex}`;
-          requestStepIndex++;
+          wrappedBody.requestId = buildAntigravityRequestId("agent");
         }
         if (wrappedBody.request && typeof wrappedBody.request === 'object') {
           // Use stable session ID for signature caching across multi-turn conversations
@@ -1719,8 +1747,8 @@ export function prepareAntigravityRequest(
 
         body = safeStringify(headerStyle === "antigravity" ? orderAntigravityEnvelope(wrappedBody) : wrappedBody);
       }
-    } catch {
-      throw new Error("Failed to build Antigravity request body");
+    } catch (err) {
+      throw new Error("Failed to build Antigravity request body", { cause: err });
     }
   }
   if (headerStyle === "antigravity") {
@@ -1881,19 +1909,7 @@ export async function transformAntigravityResponse(
         onInjectDebug: injectDebugThinking,
         onUsageMetadata: (usage) => {
           if (effectiveModel) {
-            const cacheRead = usage.cachedContentTokenCount
-            const totalInput = usage.promptTokenCount ?? usage.totalTokenCount
-            const hitRate = totalInput > 0 ? Math.round((cacheRead / totalInput) * 100) : 0
-            const status = cacheRead > 0 ? "HIT" : "MISS"
-            const thinkingTokens = usage.thoughtsTokenCount ?? 0
-            const outputTokens = (usage.candidatesTokenCount ?? 0) + thinkingTokens
-            logCacheStats(effectiveModel, cacheRead, 0, totalInput);
-            log.debug(`[Cache] ${status} model=${effectiveModel} read=${cacheRead} total=${totalInput} hitRate=${hitRate}%`)
-            if (thinkingTokens > 0) {
-              log.debug(`[Usage] model=${effectiveModel} output=${outputTokens} (candidates=${usage.candidatesTokenCount ?? 0} thinking=${thinkingTokens})`)
-            }
-            const statsFamily = effectiveModel.includes("claude") ? "claude" : "gemini"
-            _lastCacheStatsByFamily[statsFamily] = { model: effectiveModel, read: cacheRead, total: totalInput, hitRate }
+            recordUsageStats(usage, effectiveModel)
           }
         },
         transformThinkingParts,
@@ -1913,6 +1929,8 @@ export async function transformAntigravityResponse(
   }
 
   const responseFallback = response.clone();
+
+  let pendingRecoveryThrow: Error | undefined
 
   try {
     const headers = new Headers(response.headers);
@@ -1937,13 +1955,18 @@ export async function transformAntigravityResponse(
         const injectedDebug = debugText ? `\n\n${debugText}` : "";
         errorBody.error.message = rawErrorMessage + debugInfo + injectedDebug;
 
-        // Check if this is a recoverable thinking error - throw to trigger retry
+        // Check if this is a recoverable thinking error - signal via finally to propagate
         if (errorType === "thinking_block_order") {
-          const recoveryError = new Error("THINKING_RECOVERY_NEEDED");
-          (recoveryError as any).recoveryType = errorType;
-          (recoveryError as any).originalError = errorBody;
-          (recoveryError as any).debugInfo = debugInfo;
-          throw recoveryError;
+          pendingRecoveryThrow = Object.assign(new Error("THINKING_RECOVERY_NEEDED"), {
+            recoveryType: errorType,
+            originalError: errorBody,
+            debugInfo,
+          })
+          return new Response(JSON.stringify(errorBody), {
+            status: response.status,
+            statusText: response.statusText,
+            headers,
+          })
         }
 
         // Detect context length / prompt too long errors - signal to caller for toast
@@ -2008,20 +2031,8 @@ export async function transformAntigravityResponse(
     
     // Log cache stats when available
     if (usage && effectiveModel) {
-      const cacheRead = usage.cachedContentTokenCount ?? 0
-      const totalInput = usage.promptTokenCount ?? usage.totalTokenCount ?? 0
-      const hitRate = totalInput > 0 ? Math.round((cacheRead / totalInput) * 100) : 0
-      const status = cacheRead > 0 ? "HIT" : "MISS"
-      const thinkingTokens = usage.thoughtsTokenCount ?? 0
-      const outputTokens = (usage.candidatesTokenCount ?? 0) + thinkingTokens
-      const statsFamily = effectiveModel.includes("claude") ? "claude" : "gemini"
-      _lastCacheStatsByFamily[statsFamily] = { model: effectiveModel, read: cacheRead, total: totalInput, hitRate }
-      logCacheStats(effectiveModel, cacheRead, 0, totalInput);
-      log.debug(`[Cache] ${status} model=${effectiveModel} read=${cacheRead} total=${totalInput} hitRate=${hitRate}%`)
-      if (thinkingTokens > 0) {
-        log.debug(`[Usage] model=${effectiveModel} output=${outputTokens} (candidates=${usage.candidatesTokenCount ?? 0} thinking=${thinkingTokens})`)
-      }
-    }    
+      recordUsageStats(usage, effectiveModel)
+    }
     if (usage?.cachedContentTokenCount !== undefined) {
       headers.set("x-antigravity-cached-content-token-count", String(usage.cachedContentTokenCount));
       if (usage.totalTokenCount !== undefined) {
@@ -2068,15 +2079,13 @@ export async function transformAntigravityResponse(
 
     return new Response(text, init);
   } catch (error) {
-    if (error instanceof Error && error.message === "THINKING_RECOVERY_NEEDED") {
-      throw error;
-    }
-
     logAntigravityDebugResponse(debugContext, response, {
       error,
       note: "Failed to transform Antigravity response",
     });
     return responseFallback;
+  } finally {
+    if (pendingRecoveryThrow) throw pendingRecoveryThrow
   }
 }
 

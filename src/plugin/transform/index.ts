@@ -42,7 +42,8 @@ export {
   CLAUDE_THINKING_MAX_OUTPUT_TOKENS,
   CLAUDE_INTERLEAVED_THINKING_HINT,
   computeClaudeMaxOutputTokens,
-} from "./claude";export type { ClaudeTransformOptions, ClaudeTransformResult } from "./claude";
+} from "./claude"
+export type { ClaudeTransformOptions, ClaudeTransformResult } from "./claude"
 
 // Gemini transforms
 export {
@@ -62,7 +63,6 @@ export type { GeminiTransformOptions, GeminiTransformResult, ImageConfig } from 
 export {
   sanitizeCrossModelPayload,
   sanitizeCrossModelPayloadInPlace,
-  getModelFamily as getCrossModelFamily,
   stripGeminiThinkingMetadata,
   stripClaudeThinkingFields,
 } from "./cross-model-sanitizer";

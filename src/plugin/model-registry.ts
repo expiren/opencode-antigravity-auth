@@ -275,11 +275,13 @@ export function getResolverAliasMap(): Record<string, string> {
   return RESOLVER_ALIASES
 }
 
+function resolveAntigravityRoute(routes: { antigravity: { defaultModel: string; byTier: Record<string, string> } }, tier?: ThinkingTier): string {
+  if (!tier) return routes.antigravity.defaultModel
+  return routes.antigravity.byTier[tier] ?? routes.antigravity.defaultModel
+}
+
 export function getGemini35FlashAntigravityModel(tier?: ThinkingTier): string {
-  if (!tier) {
-    return GEMINI_35_FLASH_ROUTES.antigravity.defaultModel
-  }
-  return GEMINI_35_FLASH_ROUTES.antigravity.byTier[tier] ?? GEMINI_35_FLASH_ROUTES.antigravity.defaultModel
+  return resolveAntigravityRoute(GEMINI_35_FLASH_ROUTES, tier)
 }
 
 export function getGemini35FlashGeminiCliFallbackModel(): string {
@@ -287,10 +289,7 @@ export function getGemini35FlashGeminiCliFallbackModel(): string {
 }
 
 export function getGemini31ProAntigravityModel(tier?: ThinkingTier): string {
-  if (!tier) {
-    return GEMINI_31_PRO_ROUTES.antigravity.defaultModel
-  }
-  return GEMINI_31_PRO_ROUTES.antigravity.byTier[tier] ?? GEMINI_31_PRO_ROUTES.antigravity.defaultModel
+  return resolveAntigravityRoute(GEMINI_31_PRO_ROUTES, tier)
 }
 
 export function getQuotaGroupForModel(modelId: string): ModelQuotaGroup | undefined {

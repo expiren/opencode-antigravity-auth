@@ -12,6 +12,7 @@ import {
 } from "../constants";
 import { createLogger } from "../plugin/logger";
 import { calculateTokenExpiry } from "../plugin/auth";
+import { fetchWithTimeout } from "../plugin/fetch-utils"
 
 const log = createLogger("oauth");
 
@@ -113,21 +114,6 @@ export async function authorizeAntigravity(projectId = ""): Promise<AntigravityA
   };
 }
 
-const FETCH_TIMEOUT_MS = 10000;
-
-async function fetchWithTimeout(
-  url: string,
-  options: RequestInit,
-  timeoutMs = FETCH_TIMEOUT_MS,
-): Promise<Response> {
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), timeoutMs);
-  try {
-    return await fetch(url, { ...options, signal: controller.signal });
-  } finally {
-    clearTimeout(timeout);
-  }
-}
 
 async function fetchProjectID(accessToken: string): Promise<string> {
   const errors: string[] = [];

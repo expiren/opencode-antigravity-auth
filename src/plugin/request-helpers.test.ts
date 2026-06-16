@@ -1572,52 +1572,50 @@ describe("createSyntheticErrorResponse", () => {
 
     expect(text).toContain("Context too long");
     expect(text).toContain("data:");
-    expect(text).toContain("message_start");
-    expect(text).toContain("message_stop");
+    expect(text).toContain("finishReason");
+    expect(text).toContain("STOP");
   });
 
-  it("uses provided model in message_start event", async () => {
+  it("does not include model in Gemini SSE body (model is envelope-level)", async () => {
     const response = createSyntheticErrorResponse("Error", "claude-opus-4");
     const text = await response.text();
 
-    expect(text).toContain("claude-opus-4");
+    // Gemini SSE format does not include model in the data frame
+    expect(text).not.toContain("claude-opus-4");
   });
 
-  it("generates valid Claude SSE event structure", async () => {
+  it("generates valid Gemini SSE event structure", async () => {
     const response = createSyntheticErrorResponse("Test", "test-model");
     const text = await response.text();
     const lines = text.split("\n").filter((l) => l.startsWith("data:"));
 
-    expect(lines.length).toBeGreaterThanOrEqual(5);
+    expect(lines.length).toBe(1);
 
-    const events = lines.map((l) => JSON.parse(l.replace("data: ", "")));
-    const eventTypes = events.map((e) => e.type);
-
-    expect(eventTypes).toContain("message_start");
-    expect(eventTypes).toContain("content_block_start");
-    expect(eventTypes).toContain("content_block_delta");
-    expect(eventTypes).toContain("content_block_stop");
-    expect(eventTypes).toContain("message_stop");
+    const event = JSON.parse(lines[0]!.replace("data: ", ""));
+    expect(event.candidates).toBeDefined();
+    expect(event.candidates[0].content.role).toBe("model");
+    expect(event.candidates[0].content.parts[0].text).toBe("Test");
+    expect(event.candidates[0].finishReason).toBe("STOP");
+    expect(event.usageMetadata).toBeDefined();
+    expect(event.usageMetadata.promptTokenCount).toBe(0);
   });
 
-  it("includes error message in content_block_delta", async () => {
+  it("includes error message in candidates content", async () => {
     const response = createSyntheticErrorResponse("Something failed", "model");
     const text = await response.text();
     const lines = text.split("\n").filter((l) => l.startsWith("data:"));
-    const events = lines.map((l) => JSON.parse(l.replace("data: ", "")));
-    const delta = events.find((e) => e.type === "content_block_delta");
+    const event = JSON.parse(lines[0]!.replace("data: ", ""));
 
-    expect(delta?.delta?.text).toBe("Something failed");
+    expect(event.candidates[0].content.parts[0].text).toBe("Something failed");
   });
 
-  it("sets end_turn stop reason in message_delta", async () => {
+  it("sets STOP finishReason in candidates", async () => {
     const response = createSyntheticErrorResponse("Error", "model");
     const text = await response.text();
     const lines = text.split("\n").filter((l) => l.startsWith("data:"));
-    const events = lines.map((l) => JSON.parse(l.replace("data: ", "")));
-    const messageDelta = events.find((e) => e.type === "message_delta");
+    const event = JSON.parse(lines[0]!.replace("data: ", ""));
 
-    expect(messageDelta?.delta?.stop_reason).toBe("end_turn");
+    expect(event.candidates[0].finishReason).toBe("STOP");
   });
 });
 

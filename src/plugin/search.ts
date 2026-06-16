@@ -6,7 +6,6 @@
  * wrapper that makes separate API calls with only the grounding tools enabled.
  */
 
-import crypto from "node:crypto"
 
 import {
   ANTIGRAVITY_ENDPOINT,
@@ -16,7 +15,7 @@ import {
   SEARCH_SYSTEM_INSTRUCTION,
 } from "../constants";
 import { createLogger } from "./logger";
-import { orderAntigravityEnvelope } from "./request";
+import { orderAntigravityEnvelope, buildAntigravityRequestId, fnv1a64 } from "./request";
 import { fetchWithRawTransport } from "./transport";
 import { getUseRawTransport } from "./config";
 
@@ -103,31 +102,12 @@ export interface SearchResult {
 // Helper Functions
 // ============================================================================
 
-const SEARCH_CONVERSATION_ID = crypto.randomUUID();
-const SEARCH_TRAJECTORY_ID = crypto.randomUUID();
-let searchStepIndex = 0;
 // Deterministic session ID from workspace directory (FNV-1a 64-bit hash)
 // Shares the same hash algorithm as request.ts — initialized via initSearchSessionId()
-let SEARCH_NUMERIC_SESSION_ID = "-3750763034362895579" // FNV-1a("") default
+let SEARCH_NUMERIC_SESSION_ID = fnv1a64("") // FNV-1a("") default
 
 export function initSearchSessionId(directory: string): void {
-  const FNV1A_64_OFFSET_BASIS = 0xCBF29CE484222325n
-  const FNV1A_64_PRIME = 0x00000100000001B3n
-  let hash = FNV1A_64_OFFSET_BASIS
-  const bytes = Buffer.from(directory, "utf-8")
-  for (const byte of bytes) {
-    hash ^= BigInt(byte)
-    hash = BigInt.asUintN(64, hash * FNV1A_64_PRIME)
-  }
-  const signed = hash > 0x7FFFFFFFFFFFFFFFn
-    ? hash - 0x10000000000000000n
-    : hash
-  SEARCH_NUMERIC_SESSION_ID = signed.toString()
-}
-
-function generateRequestId(): string {
-  const timestamp = Date.now().toString();
-  return `agent/${SEARCH_CONVERSATION_ID}/${timestamp}/${SEARCH_TRAJECTORY_ID}/${searchStepIndex++}`;
+  SEARCH_NUMERIC_SESSION_ID = fnv1a64(directory)
 }
 
 function formatSearchResult(result: SearchResult): string {
@@ -280,7 +260,7 @@ export async function executeSearch(
     project: projectId,
     model: SEARCH_MODEL,
     userAgent: "antigravity",
-    requestId: generateRequestId(),
+    requestId: buildAntigravityRequestId("agent"),
     requestType: "agent",
     request: {
       ...requestPayload,

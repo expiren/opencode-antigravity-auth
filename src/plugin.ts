@@ -35,12 +35,12 @@ import {
   isGenerativeLanguageRequest,
   prepareAntigravityRequest,
   transformAntigravityResponse,
-} from "./plugin/request";import { resolveModelWithTier } from "./plugin/transform/model-resolver";
+} from "./plugin/request"
+import { resolveModelWithTier } from "./plugin/transform/model-resolver"
 import {
   isEmptyResponseBody,
   createSyntheticErrorResponse,
 } from "./plugin/request-helpers";
-import { EmptyResponseError } from "./plugin/errors";
 import { AntigravityTokenRefreshError, refreshAccessToken } from "./plugin/token";
 import { startOAuthListener, type OAuthListener } from "./plugin/server";
 import { clearAccounts, loadAccounts, saveAccounts, saveAccountsReplace, getConfigDir } from "./plugin/storage";
@@ -48,11 +48,12 @@ import { AccountManager, type ModelFamily, parseRateLimitReason, calculateBackof
 import { createAutoUpdateCheckerHook } from "./hooks/auto-update-checker";
 import { buildAuthFromStoredAccount, detectAuthStorageDrift } from "./plugin/auth-drift";
 import { createAuthDoctorReport, formatAuthDoctorReport } from "./plugin/auth-doctor";
-import { loadConfig, initRuntimeConfig, getUseRawTransport, getResponseTimeoutMs, type AntigravityConfig } from "./plugin/config";
+import { loadConfig, initRuntimeConfig, getUseRawTransport, type AntigravityConfig } from "./plugin/config";
 import { createSessionRecoveryHook, getRecoverySuccessToast } from "./plugin/recovery";
 import { checkAccountsQuota } from "./plugin/quota";
 import { formatCachedQuotaWithStatus, classifyGroupStatus, formatQuotaStatusBadge } from "./plugin/ui/quota-status";
-import { initDiskSignatureCache } from "./plugin/cache";import { createProactiveRefreshQueue, type ProactiveRefreshQueue } from "./plugin/refresh-queue";
+import { initDiskSignatureCache } from "./plugin/cache"
+import { createProactiveRefreshQueue, type ProactiveRefreshQueue } from "./plugin/refresh-queue"
 import { initLogger, createLogger } from "./plugin/logger";
 import { initHealthTracker, getHealthTracker, initTokenTracker, getTokenTracker } from "./plugin/rotation";
 import { getAntigravityVersionResolution, initAntigravityVersion } from "./plugin/version";
@@ -71,12 +72,6 @@ import type {
 const MAX_OAUTH_ACCOUNTS = 10;
 const MAX_WARMUP_SESSIONS = 1000;
 const MAX_WARMUP_RETRIES = 2;
-const CAPACITY_BACKOFF_TIERS_MS = [5000, 10000, 20000, 30000, 60000];
-
-function getCapacityBackoffDelay(consecutiveFailures: number): number {
-  const index = Math.min(consecutiveFailures, CAPACITY_BACKOFF_TIERS_MS.length - 1);
-  return CAPACITY_BACKOFF_TIERS_MS[Math.max(0, index)] ?? 5000;
-}
 const warmupAttemptedSessionIds = new Set<string>();
 const warmupSucceededSessionIds = new Set<string>();
 
@@ -118,6 +113,18 @@ async function saveIneligibleAccount(
   } catch (err) {
     log.warn("Failed to save ineligible account", { error: err });
   }
+}
+
+/** Check if any quota group has remaining capacity. */
+function hasAnyQuotaCapacity(groups: Record<string, { remainingFraction?: number }>): boolean {
+  return Object.values(groups).some(
+    (g) => typeof g.remainingFraction === "number" && g.remainingFraction > 0
+  );
+}
+
+/** Format a millisecond delay as human-readable "Ns" or "Nms". */
+function formatDelayMs(ms: number): string {
+  return ms >= 1000 ? `${Math.round(ms / 1000)}s` : `${ms}ms`;
 }
 
 // Module-level toast debounce to persist across requests (fixes toast spam)
@@ -173,7 +180,7 @@ async function triggerAsyncQuotaRefreshForAccount(
   
   const accounts = accountManager.getAccounts();
   const account = accounts[accountIndex];
-  if (!account || account.enabled === false) return;
+  if (!account || !account.enabled) return;
   
   const accountKey = account.email ?? `idx-${accountIndex}`;
   if (quotaRefreshInProgressByEmail.has(accountKey)) return;
@@ -259,9 +266,7 @@ async function triggerFleetQuotaRefresh(
         if (res.status === "ok" && res.quota?.groups) {
           accountManager.updateQuotaCache(originalIndex, res.quota.groups);
 
-          const hasCapacity = Object.values(res.quota.groups).some(
-            (g) => typeof g.remainingFraction === "number" && g.remainingFraction > 0
-          );
+          const hasCapacity = hasAnyQuotaCapacity(res.quota.groups);
           if (hasCapacity) {
             accountManager.clearRateLimitsForAccount(originalIndex);
           }
@@ -633,9 +638,7 @@ async function verifyAccountAccess(
   let responseBody = "";
   try {
     responseBody = await response.text();
-  } catch {
-    responseBody = "";
-  }
+  } catch {}
 
   if (response.ok) {
     return { status: "ok", message: "Account verification check passed." };
@@ -1144,12 +1147,8 @@ function extractRateLimitBodyInfo(body: unknown): RateLimitBodyInfo {
 async function extractRetryInfoFromBody(response: Response): Promise<RateLimitBodyInfo> {
   try {
     const text = await response.clone().text();
-    try {
-      const parsed = JSON.parse(text) as unknown;
-      return extractRateLimitBodyInfo(parsed);
-    } catch {
-      return { retryDelayMs: null };
-    }
+    const parsed = JSON.parse(text) as unknown;
+    return extractRateLimitBodyInfo(parsed);
   } catch {
     return { retryDelayMs: null };
   }
@@ -1255,17 +1254,6 @@ function resetRateLimitState(accountIndex: number, quotaKey: string): void {
   rateLimitStateByAccountQuota.delete(stateKey);
 }
 
-/**
- * Reset all rate limit state for an account (all quotas).
- * Used when account is completely healthy.
- */
-function resetAllRateLimitStateForAccount(accountIndex: number): void {
-  for (const key of rateLimitStateByAccountQuota.keys()) {
-    if (key.startsWith(`${accountIndex}:`)) {
-      rateLimitStateByAccountQuota.delete(key);
-    }
-  }
-}
 
 function headerStyleToQuotaKey(headerStyle: HeaderStyle, family: ModelFamily): string {
   if (family === "claude") return "claude";
@@ -1598,8 +1586,6 @@ export const createAntigravityPlugin = (providerId: string) => async (
 
       // Validate that stored accounts are in sync with OpenCode's auth
       // If OpenCode's refresh token doesn't match any stored account, clear stale storage
-      const authParts = parseRefreshParts(auth.refresh);
-      const storedAccounts = await loadAccounts();
       
       // Note: AccountManager now ensures the current auth is always included in accounts
 
@@ -1710,6 +1696,20 @@ export const createAntigravityPlugin = (providerId: string) => async (
           };
 
           let lastFailure: FailureContext | null = null;
+          const returnLastFailureResponse = () => transformAntigravityResponse(
+            lastFailure!.response,
+            lastFailure!.streaming,
+            lastFailure!.debugContext,
+            lastFailure!.requestedModel,
+            lastFailure!.projectId,
+            lastFailure!.endpoint,
+            lastFailure!.effectiveModel,
+            lastFailure!.sessionId,
+            lastFailure!.toolDebugMissing,
+            lastFailure!.toolDebugSummary,
+            lastFailure!.toolDebugPayload,
+            debugLines,
+          )
           let lastError: Error | null = null;
           const abortSignal = init?.signal ?? undefined;
           const responseTimeoutMs = (config.response_timeout_seconds ?? 180) * 1000;
@@ -1772,7 +1772,6 @@ if (toastScope === "root_only" && getIsChildSession()) {
             const accountCount = accountManager.getAccountCount();
             const routingDecision = resolveHeaderRoutingDecision(urlString, family, config);
             const {
-              cliFirst,
               preferredHeaderStyle,
               explicitQuota,
               allowQuotaFallback,
@@ -1859,7 +1858,6 @@ if (toastScope === "root_only" && getIsChildSession()) {
                     model ?? "unknown",
                   );                }
                 
-                const waitSecValue = Math.max(1, Math.ceil(softQuotaWaitMs / 1000));
                 pushDebug(`all-over-soft-quota family=${family} accounts=${accountCount} waitMs=${softQuotaWaitMs}`);
                 
                 if (!softQuotaToastShown) {
@@ -2373,7 +2371,6 @@ if (toastScope === "root_only" && getIsChildSession()) {
                   }
 
                   const defaultRetryMs = (config.default_retry_after_seconds ?? 60) * 1000;
-                  const maxBackoffMs = (config.max_backoff_seconds ?? 60) * 1000;
                   const headerRetryMs = retryAfterMsFromResponse(response, defaultRetryMs);
                   const bodyInfo = await extractRetryInfoFromBody(response);
                   const serverRetryMs = bodyInfo.retryDelayMs ?? headerRetryMs;
@@ -2431,7 +2428,7 @@ if (toastScope === "root_only" && getIsChildSession()) {
                   
                   // Only now do we call getRateLimitBackoff, which increments the global failure tracker
                   const quotaKey = headerStyleToQuotaKey(headerStyle, family);
-                  const { attempt, delayMs, isDuplicate } = getRateLimitBackoff(account.index, quotaKey, serverRetryMs);
+                  const { attempt, delayMs } = getRateLimitBackoff(account.index, quotaKey, serverRetryMs);
                   
                   // Calculate potential backoffs
                   const smartBackoffMs = calculateBackoffMs(rateLimitReason, account.consecutiveFailures ?? 0, serverRetryMs);
@@ -2463,7 +2460,6 @@ if (toastScope === "root_only" && getIsChildSession()) {
 
                   getHealthTracker().recordRateLimit(account.index);
 
-                  const accountLabel = account.email || `Account ${account.index + 1}`;
 
                   // Progressive retry for standard 429s: 1st 429 → 1s then switch (if enabled) or retry same
                   if (attempt === 1 && rateLimitReason !== "QUOTA_EXHAUSTED") {
@@ -2509,7 +2505,7 @@ if (toastScope === "root_only" && getIsChildSession()) {
                       if (hasOtherAccountWithAntigravity(account)) {
                         pushDebug(`antigravity exhausted on account ${account.index}, but available on others. Switching account.`);
                         const switchDelayMs1 = config.switch_account_delay_ms ?? 500;
-                        const switchDelayFormatted1 = switchDelayMs1 >= 1000 ? `${Math.round(switchDelayMs1 / 1000)}s` : `${switchDelayMs1}ms`;
+                        const switchDelayFormatted1 = formatDelayMs(switchDelayMs1);
                         await showToast(`Rate limited. Switching account in ${switchDelayFormatted1}...`, "warning");
                         await sleep(switchDelayMs1, abortSignal);                        shouldSwitchAccount = true;
                         break;
@@ -2557,19 +2553,18 @@ if (toastScope === "root_only" && getIsChildSession()) {
                     }
                   }
 
-                  const quotaName = headerStyle === "antigravity" ? "Antigravity" : "Gemini CLI";
 
                   if (accountCount > 1) {
                     const quotaMsg = bodyInfo.quotaResetTime 
                       ? ` (quota resets ${bodyInfo.quotaResetTime})`
                       : ``;
                     const switchDelayMs2 = config.switch_account_delay_ms ?? 500;
-                    const switchDelayFormatted2 = switchDelayMs2 >= 1000 ? `${Math.round(switchDelayMs2 / 1000)}s` : `${switchDelayMs2}ms`;
+                    const switchDelayFormatted2 = formatDelayMs(switchDelayMs2);
                     await showToast(`Rate limited. Switching account in ${switchDelayFormatted2}...${quotaMsg}`, "warning");
                     await sleep(switchDelayMs2, abortSignal);                  } else {
                     // Single account: exponential backoff (1s, 2s, 4s, 8s... max 60s)
                     const expBackoffMs = Math.min(FIRST_RETRY_DELAY_MS * Math.pow(2, attempt - 1), 60000);
-                    const expBackoffFormatted = expBackoffMs >= 1000 ? `${Math.round(expBackoffMs / 1000)}s` : `${expBackoffMs}ms`;
+                    const expBackoffFormatted = formatDelayMs(expBackoffMs);
                     await showToast(`Rate limited. Retrying in ${expBackoffFormatted} (attempt ${attempt})...`, "warning");
                     await sleep(expBackoffMs, abortSignal);
                   }
@@ -2880,20 +2875,7 @@ if (toastScope === "root_only" && getIsChildSession()) {
               if (accountSwitchCount > maxAccountSwitches) {
                 pushDebug(`account-switch-cap: exceeded max_account_switches=${maxAccountSwitches}, giving up`);
                 if (lastFailure) {
-                  return transformAntigravityResponse(
-                    lastFailure.response,
-                    lastFailure.streaming,
-                    lastFailure.debugContext,
-                    lastFailure.requestedModel,
-                    lastFailure.projectId,
-                    lastFailure.endpoint,
-                    lastFailure.effectiveModel,
-                    lastFailure.sessionId,
-                    lastFailure.toolDebugMissing,
-                    lastFailure.toolDebugSummary,
-                    lastFailure.toolDebugPayload,
-                    debugLines,
-                  );
+                  return returnLastFailureResponse()
                 }
                 return createSyntheticErrorResponse(
                   lastError?.message || `Exceeded max account switches (${maxAccountSwitches}). All accounts rate-limited.`,
@@ -2903,20 +2885,7 @@ if (toastScope === "root_only" && getIsChildSession()) {
               
               // Avoid tight retry loops when there's only one account.
               if (accountCount <= 1) {                if (lastFailure) {
-                  return transformAntigravityResponse(
-                    lastFailure.response,
-                    lastFailure.streaming,
-                    lastFailure.debugContext,
-                    lastFailure.requestedModel,
-                    lastFailure.projectId,
-                    lastFailure.endpoint,
-                    lastFailure.effectiveModel,
-                    lastFailure.sessionId,
-                    lastFailure.toolDebugMissing,
-                    lastFailure.toolDebugSummary,
-                    lastFailure.toolDebugPayload,
-                    debugLines,
-                  );
+                  return returnLastFailureResponse()
                 }
 
                 return createSyntheticErrorResponse(
@@ -2930,20 +2899,7 @@ if (toastScope === "root_only" && getIsChildSession()) {
 
             // If we get here without returning, something went wrong
             if (lastFailure) {
-              return transformAntigravityResponse(
-                lastFailure.response,
-                lastFailure.streaming,
-                lastFailure.debugContext,
-                lastFailure.requestedModel,
-                lastFailure.projectId,
-                lastFailure.endpoint,
-                lastFailure.effectiveModel,
-                lastFailure.sessionId,
-                lastFailure.toolDebugMissing,
-                lastFailure.toolDebugSummary,
-                lastFailure.toolDebugPayload,
-                debugLines,
-              );
+              return returnLastFailureResponse()
             }
 
             return createSyntheticErrorResponse(
@@ -2992,9 +2948,7 @@ if (toastScope === "root_only" && getIsChildSession()) {
                         (resetTime) => typeof resetTime === 'number' && resetTime > now
                       );
                       if (isRateLimited) {
-                        const hasQuotaCapacity = acc.cachedQuota && Object.values(acc.cachedQuota).some(
-                          (g) => typeof g.remainingFraction === "number" && g.remainingFraction > 0
-                        );
+                        const hasQuotaCapacity = acc.cachedQuota && hasAnyQuotaCapacity(acc.cachedQuota);
                         status = hasQuotaCapacity ? 'active' : 'rate-limited';
                       } else {
                         status = 'active';
@@ -3004,9 +2958,7 @@ if (toastScope === "root_only" && getIsChildSession()) {
                     }
 
                     if (acc.coolingDownUntil && acc.coolingDownUntil > now) {
-                      const hasQuotaCapacity = acc.cachedQuota && Object.values(acc.cachedQuota).some(
-                        (g) => typeof g.remainingFraction === "number" && g.remainingFraction > 0
-                      );
+                      const hasQuotaCapacity = acc.cachedQuota && hasAnyQuotaCapacity(acc.cachedQuota);
                       if (!hasQuotaCapacity) {
                         status = 'rate-limited';
                       }
@@ -3175,9 +3127,7 @@ if (toastScope === "root_only" && getIsChildSession()) {
                         // the account has remaining capacity. This prevents false
                         // "rate-limited" counts from persisted 7-day QUOTA_EXHAUSTED
                         // lockouts that are no longer accurate.
-                        const hasAnyQuota = Object.values(res.quota.groups).some(
-                          (g) => typeof g.remainingFraction === "number" && g.remainingFraction > 0
-                        );
+                        const hasAnyQuota = hasAnyQuotaCapacity(res.quota.groups);
                         if (hasAnyQuota) {
                           acc.rateLimitResetTimes = {};
                           acc.coolingDownUntil = undefined;
@@ -3885,7 +3835,7 @@ function extractModelFromUrl(urlString: string): string | null {
 }
 
 function extractModelFromUrlWithSuffix(urlString: string): string | null {
-  const match = urlString.match(/\/models\/([^:\/\?]+)/);
+  const match = urlString.match(/\/models\/([^:\/?]+)/);
   return match?.[1] ?? null;
 }
 
@@ -3934,7 +3884,7 @@ function resolveHeaderRoutingDecision(
     cliFirst,
     preferredHeaderStyle,
     explicitQuota,
-    allowQuotaFallback: family === "gemini" && !!(config.quota_style_fallback ?? false),
+    allowQuotaFallback: family === "gemini" && (config.quota_style_fallback ?? false),
   };
 }
 

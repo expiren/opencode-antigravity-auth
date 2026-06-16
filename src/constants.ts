@@ -29,7 +29,6 @@ export const ANTIGRAVITY_REDIRECT_URI = "http://localhost:51121/oauth-callback";
  * Real agy CLI 1.0.4 traffic uses daily-cloudcode-pa.googleapis.com.
  */
 export const ANTIGRAVITY_ENDPOINT_DAILY = "https://daily-cloudcode-pa.googleapis.com";
-export const ANTIGRAVITY_ENDPOINT_AUTOPUSH = "https://autopush-cloudcode-pa.sandbox.googleapis.com";
 export const ANTIGRAVITY_ENDPOINT_PROD = "https://cloudcode-pa.googleapis.com";
 
 /**
@@ -82,8 +81,6 @@ export function setAntigravityVersion(version: string): void {
   versionLocked = true;
 }
 
-/** @deprecated Use getAntigravityVersion() for runtime access. */
-export const ANTIGRAVITY_VERSION = ANTIGRAVITY_VERSION_FALLBACK;
 
 export function getAntigravityHeaders(): HeaderSet & { "Client-Metadata": string } {
   const platform = process.platform === "win32" ? "windows" : process.platform;
@@ -105,12 +102,6 @@ export function getContentRequestUserAgent(): string {
   return `antigravity/ide/${getAntigravityVersion()} ${platform}/${arch}`;
 }
 
-/** @deprecated Use getAntigravityHeaders() for runtime access. */
-export const ANTIGRAVITY_HEADERS = {
-  "User-Agent": `antigravity/${ANTIGRAVITY_VERSION} ${process.platform === "win32" ? "windows" : process.platform}/${process.arch === "x64" ? "amd64" : process.arch} google-api-nodejs-client/10.3.0`,
-  "X-Goog-Api-Client": `gl-node/${process.versions.node}`,
-  "Client-Metadata": `{"ideType":"ANTIGRAVITY","platform":"${process.platform === "win32" ? "WINDOWS" : "MACOS"}","pluginType":"GEMINI"}`,
-} as const;
 
 export const GEMINI_CLI_VERSION = "1.0.0";
 
@@ -237,15 +228,6 @@ export const SKIP_THOUGHT_SIGNATURE = "skip_thought_signature_validator";
  */
 export const SEARCH_MODEL = "gemini-2.5-flash";
 
-/**
- * Thinking budget for deep search (more thorough analysis).
- */
-export const SEARCH_THINKING_BUDGET_DEEP = 16384;
-
-/**
- * Thinking budget for fast search (quick results).
- */
-export const SEARCH_THINKING_BUDGET_FAST = 4096;
 
 /**
  * Timeout for search requests in milliseconds (60 seconds).

@@ -27,6 +27,7 @@ async function getLockFunction(): Promise<LockFunction> {
 const lockfile = { lock: (path: string, options?: Record<string, unknown>) => getLockFunction().then(fn => fn(path, options)) }
 import type { HeaderStyle } from "../constants";
 import { createLogger } from "./logger";
+import { getConfigDir } from "./config/paths"
 
 const log = createLogger("storage");
 
@@ -262,23 +263,6 @@ function getLegacyWindowsConfigDir(): string {
   );
 }
 
-/**
- * Gets the config directory path, with the following precedence:
- * 1. OPENCODE_CONFIG_DIR env var (if set)
- * 2. ~/.config/opencode (all platforms, including Windows)
- *
- * On Windows, also checks for legacy %APPDATA%\opencode path for migration.
- */
-function getConfigDir(): string {
-  // 1. Check for explicit override via env var
-  if (process.env.OPENCODE_CONFIG_DIR) {
-    return process.env.OPENCODE_CONFIG_DIR;
-  }
-
-  // 2. Use ~/.config/opencode on all platforms (including Windows)
-  const xdgConfig = process.env.XDG_CONFIG_HOME || join(homedir(), ".config");
-  return join(xdgConfig, "opencode");
-}
 
 /**
  * Migrates config from legacy Windows location to the new path.

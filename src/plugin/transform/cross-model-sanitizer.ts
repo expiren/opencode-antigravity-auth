@@ -141,32 +141,43 @@ function sanitizeParts(
   return { parts: sanitizedParts, stripped: totalStripped };
 }
 
+function sanitizeItems<K extends string>(
+  items: unknown[],
+  fieldName: K,
+  targetFamily: ModelFamily,
+  preserveNonSignature: boolean
+): { items: unknown[]; stripped: number } {
+  let totalStripped = 0
+
+  const sanitizedItems = items.map((item) => {
+    if (typeof item !== "object" || item === null) return item
+
+    const copy = { ...item } as Record<string, unknown>
+    const childArray = copy[fieldName]
+
+    if (Array.isArray(childArray)) {
+      const result = sanitizeParts(
+        childArray,
+        targetFamily,
+        preserveNonSignature
+      )
+      copy[fieldName] = result.parts
+      totalStripped += result.stripped
+    }
+
+    return copy
+  })
+
+  return { items: sanitizedItems, stripped: totalStripped }
+}
+
 function sanitizeContents(
   contents: unknown[],
   targetFamily: ModelFamily,
   preserveNonSignature: boolean
 ): { contents: unknown[]; stripped: number } {
-  let totalStripped = 0;
-
-  const sanitizedContents = contents.map((content) => {
-    if (!isPlainObject(content)) return content;
-
-    const contentObj = { ...content } as Record<string, unknown>;
-
-    if (Array.isArray(contentObj.parts)) {
-      const result = sanitizeParts(
-        contentObj.parts,
-        targetFamily,
-        preserveNonSignature
-      );
-      contentObj.parts = result.parts;
-      totalStripped += result.stripped;
-    }
-
-    return contentObj;
-  });
-
-  return { contents: sanitizedContents, stripped: totalStripped };
+  const { items, stripped } = sanitizeItems(contents, "parts", targetFamily, preserveNonSignature)
+  return { contents: items, stripped }
 }
 
 function sanitizeMessages(
@@ -174,27 +185,8 @@ function sanitizeMessages(
   targetFamily: ModelFamily,
   preserveNonSignature: boolean
 ): { messages: unknown[]; stripped: number } {
-  let totalStripped = 0;
-
-  const sanitizedMessages = messages.map((message) => {
-    if (!isPlainObject(message)) return message;
-
-    const messageObj = { ...message } as Record<string, unknown>;
-
-    if (Array.isArray(messageObj.content)) {
-      const result = sanitizeParts(
-        messageObj.content,
-        targetFamily,
-        preserveNonSignature
-      );
-      messageObj.content = result.parts;
-      totalStripped += result.stripped;
-    }
-
-    return messageObj;
-  });
-
-  return { messages: sanitizedMessages, stripped: totalStripped };
+  const { items, stripped } = sanitizeItems(messages, "content", targetFamily, preserveNonSignature)
+  return { messages: items, stripped }
 }
 
 export function deepSanitizeCrossModelMetadata(

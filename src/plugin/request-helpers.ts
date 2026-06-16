@@ -1,10 +1,8 @@
 import { getKeepThinking, getClaudeSentinelText } from "./config";
 import { createLogger } from "./logger";
-import { cacheSignature } from "./cache";
 import {
-  EMPTY_SCHEMA_PLACEHOLDER_NAME,
-  EMPTY_SCHEMA_PLACEHOLDER_DESCRIPTION,
-  SKIP_THOUGHT_SIGNATURE,
+EMPTY_SCHEMA_PLACEHOLDER_NAME,
+  EMPTY_SCHEMA_PLACEHOLDER_DESCRIPTION
 } from "../constants";
 import { processImageData } from "./image-saver";
 import type { GoogleSearchConfig } from "./transform/types";
@@ -322,33 +320,22 @@ function tryMergeEnumFromUnion(options: any[]): string[] | null {
       return null;
     }
 
-    // Check for const value
     if (option.const !== undefined) {
+      // Check for const value
       enumValues.push(String(option.const));
-      continue;
-    }
-
-    // Check for single-value enum
-    if (Array.isArray(option.enum) && option.enum.length === 1) {
+    } else if (Array.isArray(option.enum) && option.enum.length === 1) {
+      // Check for single-value enum
       enumValues.push(String(option.enum[0]));
-      continue;
-    }
-
-    // Check for multi-value enum (merge all values)
-    if (Array.isArray(option.enum) && option.enum.length > 0) {
+    } else if (Array.isArray(option.enum) && option.enum.length > 0) {
+      // Check for multi-value enum (merge all values)
       for (const val of option.enum) {
         enumValues.push(String(val));
       }
-      continue;
-    }
-
-    // If option has complex structure (properties, items, etc.), it's not a simple enum
-    if (option.properties || option.items || option.anyOf || option.oneOf || option.allOf) {
+    } else if (option.properties || option.items || option.anyOf || option.oneOf || option.allOf) {
+      // Complex structure — not a simple enum
       return null;
-    }
-
-    // If option has only type (no const/enum), it's not an enum pattern
-    if (option.type && !option.const && !option.enum) {
+    } else if (option.type) {
+      // Only type present (no const/enum) — not an enum pattern
       return null;
     }
   }
@@ -476,8 +463,7 @@ function flattenTypeArrays(schema: any, nullableFields?: Map<string, string[]>, 
     const nonNullTypes = types.filter(t => t !== "null" && t);
 
     // Select first non-null type, or "string" as fallback
-    const firstType = nonNullTypes.length > 0 ? nonNullTypes[0] : "string";
-    result.type = firstType;
+    result.type = nonNullTypes[0] ?? "string";
 
     // Add hint for multiple types
     if (nonNullTypes.length > 1) {
@@ -536,6 +522,7 @@ function flattenTypeArrays(schema: any, nullableFields?: Map<string, string[]>, 
 /**
  * Phase 3: Removes unsupported keywords after hints have been extracted.
  * @param insideProperties - When true, keys are property NAMES (preserve); when false, keys are JSON Schema keywords (filter).
+ * @param schema - The JSON schema object to remove unsupported keywords from
  */
 function removeUnsupportedKeywords(schema: any, insideProperties: boolean = false): any {
   if (!schema || typeof schema !== "object") {
@@ -653,8 +640,8 @@ function addEmptySchemaPlaceholder(schema: any): any {
 /**
  * Cleans a JSON schema for Antigravity API compatibility.
  * Transforms unsupported features into description hints while preserving semantic information.
- * 
- * Ported from CLIProxyAPI's CleanJSONSchemaForAntigravity (gemini_schema.go)
+ *
+ * @param schema - The JSON schema object to clean
  */
 export function cleanJSONSchemaForAntigravity(schema: any): any {
   if (!schema || typeof schema !== "object") {
@@ -1124,6 +1111,26 @@ function findLastAssistantIndex(contents: any[], roleValue: "model" | "assistant
   return -1;
 }
 
+function createThinkingSentinel(item: Record<string, unknown>): Record<string, unknown> {
+  const sentinel: Record<string, unknown> = { text: getClaudeSentinelText() }
+  if (item.cache_control) sentinel.cache_control = item.cache_control
+  return sentinel
+}
+
+/** Push sanitized thinking part or sentinel fallback to preserve array length. */
+function pushSanitizedOrSentinel(
+  filtered: any[],
+  item: Record<string, unknown>,
+  sentinelSource: Record<string, unknown> = item,
+): void {
+  const sanitized = sanitizeThinkingPart(item)
+  if (sanitized) {
+    filtered.push(sanitized)
+  } else {
+    filtered.push(createThinkingSentinel(sentinelSource))
+  }
+}
+
 function filterContentArray(
   contentArray: any[],
   sessionId?: string,
@@ -1175,9 +1182,8 @@ function filterContentArray(
     if (isClaudeModel && (isThinking || hasSignature)) {
       // Use plain empty text part — thinking-format sentinels get converted by the proxy
       // into Claude thinking blocks with missing required fields
-      const sentinel: Record<string, unknown> = { text: getClaudeSentinelText() };
-      if (item.cache_control) sentinel.cache_control = item.cache_control;
-      filtered.push(sentinel);
+      const sentinel = createThinkingSentinel(item)
+      filtered.push(sentinel)
       continue;
     }
     // For the LAST assistant message with thinking blocks:
@@ -1188,15 +1194,7 @@ function filterContentArray(
     if (isLastAssistantMessage && (isThinking || hasSignature)) {
       // First check if it's our cached signature
       if (isOurCachedSignature(item, sessionId, getCachedSignatureFn)) {
-        const sanitized = sanitizeThinkingPart(item);
-        if (sanitized) {
-          filtered.push(sanitized);
-        } else {
-          // sanitizeThinkingPart returned null — use sentinel to preserve array length
-          const sentinel: Record<string, unknown> = { text: getClaudeSentinelText() };
-          if (item.cache_control) sentinel.cache_control = item.cache_control;
-          filtered.push(sentinel);
-        }
+        pushSanitizedOrSentinel(filtered, item as Record<string, unknown>)
         continue;
       }
       
@@ -1204,21 +1202,13 @@ function filterContentArray(
       const existingSignature = item.signature || item.thoughtSignature;
       const signatureInfo = existingSignature ? `foreign signature (${String(existingSignature).length} chars)` : "no signature";
       log.debug(`Injecting plain text sentinel for last-message thinking block with ${signatureInfo}`);
-      const sentinel: Record<string, unknown> = { text: getClaudeSentinelText() };
-      if (item.cache_control) sentinel.cache_control = item.cache_control;
-      filtered.push(sentinel);
-      continue;    }
+      const sentinel = createThinkingSentinel(item)
+      filtered.push(sentinel)
+      continue
+    }
 
     if (isOurCachedSignature(item, sessionId, getCachedSignatureFn)) {
-      const sanitized = sanitizeThinkingPart(item);
-      if (sanitized) {
-        filtered.push(sanitized);
-      } else {
-        // sanitizeThinkingPart returned null — use sentinel to preserve array length
-        const sentinel: Record<string, unknown> = { text: getClaudeSentinelText() };
-        if (item.cache_control) sentinel.cache_control = item.cache_control;
-        filtered.push(sentinel);
-      }
+      pushSanitizedOrSentinel(filtered, item as Record<string, unknown>)
       continue;
     }
 
@@ -1234,14 +1224,7 @@ function filterContentArray(
             (restoredPart as any).signature = cachedSignature;
           }
           const sanitized = sanitizeThinkingPart(restoredPart as Record<string, unknown>);
-          if (sanitized) {
-            filtered.push(sanitized);
-          } else {
-            // sanitizeThinkingPart returned null — use sentinel to preserve array length
-            const sentinel: Record<string, unknown> = { text: getClaudeSentinelText() };
-            if (item.cache_control) sentinel.cache_control = item.cache_control;
-            filtered.push(sentinel);
-          }
+          pushSanitizedOrSentinel(filtered, restoredPart as Record<string, unknown>, item as Record<string, unknown>)
           continue;
         }
       }
@@ -1249,9 +1232,8 @@ function filterContentArray(
 
     // Catch-all: thinking/signature part that didn't match any branch above
     // Use sentinel instead of silently dropping to preserve array length
-    const sentinel: Record<string, unknown> = { text: getClaudeSentinelText() };
-    if (item.cache_control) sentinel.cache_control = item.cache_control;
-    filtered.push(sentinel);
+    const sentinel = createThinkingSentinel(item)
+    filtered.push(sentinel)
   }
 
   return filtered;}
@@ -1263,6 +1245,7 @@ function filterContentArray(
  * @param contents - The contents array from the request
  * @param sessionId - Optional session ID for signature cache lookup
  * @param getCachedSignatureFn - Optional function to retrieve cached signatures
+ * @param isClaudeModel - Whether this is a Claude model (affects sentinel text selection)
  */
 export function filterUnsignedThinkingBlocks(
   contents: any[],
@@ -1568,7 +1551,7 @@ export function normalizeThinkingConfig(config: unknown): ThinkingConfig | undef
   const enableThinking = thinkingBudget !== undefined && thinkingBudget > 0;
   const finalInclude = enableThinking ? includeThoughts ?? false : false;
 
-  if (!enableThinking && finalInclude === false && thinkingBudget === undefined && includeThoughts === undefined) {
+  if (thinkingBudget === undefined && includeThoughts === undefined) {
     return undefined;
   }
 
@@ -1576,9 +1559,7 @@ export function normalizeThinkingConfig(config: unknown): ThinkingConfig | undef
   if (thinkingBudget !== undefined) {
     normalized.thinkingBudget = thinkingBudget;
   }
-  if (finalInclude !== undefined) {
-    normalized.includeThoughts = finalInclude;
-  }
+  normalized.includeThoughts = finalInclude;
   return normalized;
 }
 
@@ -1653,7 +1634,7 @@ export function extractUsageFromSsePayload(payload: string): AntigravityUsageMet
         }
       }
     } catch {
-      continue;
+      // JSON.parse may fail on malformed SSE lines — skip
     }
   }
   return null;
@@ -1809,78 +1790,6 @@ export function isEmptyResponseBody(text: string): boolean {
   } catch {
     // JSON parse error - treat as empty
     return true;
-  }
-}
-
-/**
- * Checks if a streaming SSE response yielded zero meaningful chunks.
- * 
- * This is used after consuming a streaming response to determine if retry is needed.
- */
-export interface StreamingChunkCounter {
-  increment: () => void;
-  getCount: () => number;
-  hasContent: () => boolean;
-}
-
-export function createStreamingChunkCounter(): StreamingChunkCounter {
-  let count = 0;
-  let hasRealContent = false;
-
-  return {
-    increment: () => {
-      count++;
-    },
-    getCount: () => count,
-    hasContent: () => hasRealContent || count > 0,
-  };
-}
-
-/**
- * Checks if an SSE line contains meaningful content.
- * 
- * @param line - A single SSE line (e.g., "data: {...}")
- * @returns true if the line contains content worth counting
- */
-export function isMeaningfulSseLine(line: string): boolean {
-  if (!line.startsWith("data: ")) {
-    return false;
-  }
-
-  const data = line.slice(6).trim();
-  
-  if (data === "[DONE]") {
-    return false;
-  }
-
-  if (!data) {
-    return false;
-  }
-
-  try {
-    const parsed = JSON.parse(data);
-    
-    // Check for candidates with content
-    if (parsed.candidates && Array.isArray(parsed.candidates)) {
-      for (const candidate of parsed.candidates) {
-        const parts = candidate?.content?.parts;
-        if (Array.isArray(parts) && parts.length > 0) {
-          for (const part of parts) {
-            if (typeof part?.text === "string" && part.text.length > 0) return true;
-            if (part?.functionCall) return true;
-          }
-        }
-      }
-    }
-    
-    // Check response wrapper
-    if (parsed.response?.candidates) {
-      return isMeaningfulSseLine(`data: ${JSON.stringify(parsed.response)}`);
-    }
-    
-    return false;
-  } catch {
-    return false;
   }
 }
 
@@ -2225,49 +2134,6 @@ export function fixToolResponseGrouping(contents: any[]): any[] {
   return newContents;
 }
 
-/**
- * Checks if contents have any tool call/response ID mismatches.
- * 
- * @param contents - Array of Gemini-style content messages
- * @returns Object with mismatch details
- */
-export function detectToolIdMismatches(contents: any[]): {
-  hasMismatches: boolean;
-  expectedIds: string[];
-  foundIds: string[];
-  missingIds: string[];
-  orphanIds: string[];
-} {
-  const expectedIds: string[] = [];
-  const foundIds: string[] = [];
-  
-  for (const content of contents) {
-    const parts = content.parts || [];
-    
-    for (const part of parts) {
-      if (part?.functionCall?.id) {
-        expectedIds.push(part.functionCall.id);
-      }
-      if (part?.functionResponse?.id) {
-        foundIds.push(part.functionResponse.id);
-      }
-    }
-  }
-  
-  const expectedSet = new Set(expectedIds);
-  const foundSet = new Set(foundIds);
-  
-  const missingIds = expectedIds.filter(id => !foundSet.has(id));
-  const orphanIds = foundIds.filter(id => !expectedSet.has(id));
-  
-  return {
-    hasMismatches: missingIds.length > 0 || orphanIds.length > 0,
-    expectedIds,
-    foundIds,
-    missingIds,
-    orphanIds,
-  };
-}
 
 // ============================================================================
 // CLAUDE FORMAT TOOL PAIRING (Defense in Depth)
@@ -2766,100 +2632,49 @@ export function applyToolPairingFixes(
 // ============================================================================
 
 /**
- * Creates a synthetic Claude SSE streaming response with error content.
- * 
- * When returning HTTP 400/500 errors to OpenCode, the session becomes locked
- * and the user cannot use /compact or other commands. This function creates
- * a fake "successful" SSE response (200 OK) with the error message as text content,
- * allowing the user to continue using the session.
- * 
+ * Creates a synthetic Gemini SSE streaming response with error content.
+ *
+ * The intercepted provider route is Google/Gemini, so the synthetic body must
+ * match OpenCode's Gemini protocol (`data: { candidates, usageMetadata }`).
+ * Returning Anthropic-style SSE here can make the downstream parser fail before
+ * it records a normal `step-finish`.
+ *
  * @param errorMessage - The error message to include in the response
- * @param requestedModel - The model that was requested
+ * @param _requestedModel - The model that was requested (unused, kept for API compat)
  * @returns A Response object with synthetic SSE stream
  */
 export function createSyntheticErrorResponse(
   errorMessage: string,
-  requestedModel: string = "unknown",
+  _requestedModel: string = "unknown",
 ): Response {
-  // Generate a unique message ID
-  const messageId = `msg_synthetic_${Date.now()}`;
-  
-  // Build Claude SSE events that represent a complete message with error text
-  const events: string[] = [];
-  
-  // 1. message_start event
-  events.push(`event: message_start
-data: ${JSON.stringify({
-    type: "message_start",
-    message: {
-      id: messageId,
-      type: "message",
-      role: "assistant",
-      content: [],
-      model: requestedModel,
-      stop_reason: null,
-      stop_sequence: null,
-      usage: { input_tokens: 0, output_tokens: 0 },
+  const outputTokens = Math.max(1, Math.ceil(errorMessage.length / 4))
+  const event = {
+    candidates: [
+      {
+        content: {
+          role: "model",
+          parts: [{ text: errorMessage }],
+        },
+        finishReason: "STOP",
+      },
+    ],
+    usageMetadata: {
+      promptTokenCount: 0,
+      candidatesTokenCount: outputTokens,
+      totalTokenCount: outputTokens,
     },
-  })}
+  }
 
-`);
+  return new Response(`data: ${JSON.stringify(event)}
 
-  // 2. content_block_start event
-  events.push(`event: content_block_start
-data: ${JSON.stringify({
-    type: "content_block_start",
-    index: 0,
-    content_block: { type: "text", text: "" },
-  })}
-
-`);
-
-  // 3. content_block_delta event with the error message
-  events.push(`event: content_block_delta
-data: ${JSON.stringify({
-    type: "content_block_delta",
-    index: 0,
-    delta: { type: "text_delta", text: errorMessage },
-  })}
-
-`);
-
-  // 4. content_block_stop event
-  events.push(`event: content_block_stop
-data: ${JSON.stringify({
-    type: "content_block_stop",
-    index: 0,
-  })}
-
-`);
-
-  // 5. message_delta event (end_turn)
-  events.push(`event: message_delta
-data: ${JSON.stringify({
-    type: "message_delta",
-    delta: { stop_reason: "end_turn", stop_sequence: null },
-    usage: { output_tokens: Math.ceil(errorMessage.length / 4) },
-  })}
-
-`);
-
-  // 6. message_stop event
-  events.push(`event: message_stop
-data: ${JSON.stringify({ type: "message_stop" })}
-
-`);
-
-  const body = events.join("");
-
-  return new Response(body, {
+`, {
     status: 200,
     headers: {
       "Content-Type": "text/event-stream",
       "Cache-Control": "no-cache",
       "Connection": "keep-alive",
       "X-Antigravity-Synthetic": "true",
-      "X-Antigravity-Error-Type": "prompt_too_long",
+      "X-Antigravity-Error-Type": "synthetic_error",
     },
-  });
+  })
 }

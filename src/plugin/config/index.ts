@@ -14,7 +14,6 @@
 
 export {
   AntigravityConfigSchema,
-  SignatureCacheConfigSchema,
   DEFAULT_CONFIG,
   type AntigravityConfig,
   type SignatureCacheConfig,
@@ -22,10 +21,6 @@ export {
 
 export {
   loadConfig,
-  getUserConfigPath,
-  getProjectConfigPath,
-  getDefaultLogsDir,
-  configExists,
   initRuntimeConfig,
   getKeepThinking,
   getClaudeSentinelText,

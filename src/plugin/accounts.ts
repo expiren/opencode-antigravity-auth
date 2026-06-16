@@ -1,5 +1,6 @@
 import { formatRefreshParts, parseRefreshParts } from "./auth";
-import { loadAccounts, saveAccounts, saveAccountsReplace, type AccountStorageV4, type AccountMetadataV3, type RateLimitStateV3, type ModelFamily, type HeaderStyle, type CooldownReason } from "./storage";
+import { loadAccounts, saveAccounts, saveAccountsReplace, type AccountStorageV4, type RateLimitStateV3 } from "./storage";
+import type { AccountMetadataV3, ModelFamily, HeaderStyle, CooldownReason } from "./storage";
 import type { OAuthAuthDetails, RefreshParts } from "./types";
 import type { AccountSelectionStrategy } from "./config/schema";
 import { getHealthTracker, getTokenTracker, selectHybridAccount, type AccountWithMetrics } from "./rotation";
@@ -20,11 +21,6 @@ export type RateLimitReason =
   | "MODEL_CAPACITY_EXHAUSTED"
   | "SERVER_ERROR"
   | "UNKNOWN";
-
-export interface RateLimitBackoffResult {
-  backoffMs: number;
-  reason: RateLimitReason;
-}
 
 const QUOTA_EXHAUSTED_BACKOFFS = [60_000, 300_000, 1_800_000, 7_200_000] as const;
 const RATE_LIMIT_EXCEEDED_BACKOFF = 30_000;
@@ -526,12 +522,8 @@ export class AccountManager {
     return this.getEnabledAccounts().length;
   }
 
-  getTotalAccountCount(): number {
-    return this.accounts.length;
-  }
-
   getEnabledAccounts(): ManagedAccount[] {
-    return this.accounts.filter((account) => account.enabled !== false);
+    return this.accounts.filter((account) => account.enabled);
   }
 
   getAccountsSnapshot(): ManagedAccount[] {
@@ -543,7 +535,7 @@ export class AccountManager {
     if (currentIndex >= 0 && currentIndex < this.accounts.length) {
       const account = this.accounts[currentIndex] ?? null;
       // Only return account if it's enabled - disabled accounts should not be selected
-      if (account && account.enabled !== false) {
+      if (account && account.enabled) {
         return account;
       }
     }
@@ -558,10 +550,6 @@ export class AccountManager {
     return this.currentAccountIndexByFamily[family];
   }
 
-  markSwitched(account: ManagedAccount, reason: "rate-limit" | "initial" | "rotation", family: ModelFamily, childSessionId: string | null = null): void {
-    account.lastSwitchReason = reason;
-    this.setActiveIndex(family, account.index, childSessionId);
-  }
 
   /**
    * Check if we should show an account switch toast.
@@ -608,7 +596,7 @@ export class AccountManager {
       const mainAccountIndex = childSessionId ? this.getMainAccountIndex(family) : -1;
       
       const accountsWithMetrics: AccountWithMetrics[] = this.accounts
-        .filter(acc => acc.enabled !== false && acc.index !== mainAccountIndex)
+        .filter(acc => acc.enabled && acc.index !== mainAccountIndex)
         .map(acc => {
           clearExpiredRateLimits(acc);
           return {
@@ -672,7 +660,7 @@ export class AccountManager {
     const mainAccountIndex = childSessionId ? this.getMainAccountIndex(family) : -1;
     const available = this.accounts.filter((a) => {
       clearExpiredRateLimits(a);
-      return a.enabled !== false && 
+      return a.enabled && 
              a.index !== mainAccountIndex &&
              !isRateLimitedForHeaderStyle(a, family, headerStyle, model) && 
              !isOverSoftQuotaThreshold(a, family, softQuotaThresholdPercent, softQuotaCacheTtlMs, model) &&
@@ -769,7 +757,7 @@ export class AccountManager {
     const mainAccountIndex = childSessionId ? this.getMainAccountIndex(family) : -1;
 
     const candidates = this.accounts.filter(acc => {
-      if (acc.enabled === false) return false;
+      if (!acc.enabled) return false;
       if (acc.index === currentIndex) return false;
       if (acc.index === mainAccountIndex) return false;
       clearExpiredRateLimits(acc);
@@ -874,10 +862,6 @@ export class AccountManager {
     delete account.cooldownReason;
   }
 
-  getAccountCooldownReason(account: ManagedAccount): CooldownReason | undefined {
-    return this.isAccountCoolingDown(account) ? account.cooldownReason : undefined;
-  }
-
   markTouchedForQuota(account: ManagedAccount, quotaKey: string): void {
     account.touchedForQuota[quotaKey] = nowMs();
   }
@@ -895,7 +879,7 @@ export class AccountManager {
   getFreshAccountsForQuota(quotaKey: string, family: ModelFamily, model?: string | null): ManagedAccount[] {
     return this.accounts.filter(acc => {
       clearExpiredRateLimits(acc);
-      return acc.enabled !== false &&
+      return acc.enabled &&
              this.isFreshForQuota(acc, quotaKey) && 
              !isRateLimitedForFamily(acc, family, model) && 
              !this.isAccountCoolingDown(acc);
@@ -953,10 +937,7 @@ export class AccountManager {
       if (acc.index === currentAccountIndex) {
         return false;
       }
-      // Skip disabled accounts
-      if (acc.enabled === false) {
-        return false;
-      }
+      if (!acc.enabled) return false;
       // Skip cooling down accounts
       if (this.isAccountCoolingDown(acc)) {
         return false;
@@ -978,12 +959,12 @@ export class AccountManager {
     if (!enabled) {
       for (const family of Object.keys(this.currentAccountIndexByFamily) as ModelFamily[]) {
         if (this.currentAccountIndexByFamily[family] === accountIndex) {
-          const next = this.accounts.find((a, i) => i !== accountIndex && a.enabled !== false);
+          const next = this.accounts.find((a, i) => i !== accountIndex && a.enabled);
           this.currentAccountIndexByFamily[family] = next?.index ?? -1;
         }
         for (const state of this.childSessions.values()) {
           if (state.accountIndexByFamily[family] === accountIndex) {
-            const next = this.accounts.find((a, i) => i !== accountIndex && a.enabled !== false);
+            const next = this.accounts.find((a, i) => i !== accountIndex && a.enabled);
             state.accountIndexByFamily[family] = next?.index ?? -1;
           }
         }
@@ -1009,7 +990,7 @@ export class AccountManager {
       account.verificationUrl = normalizedVerifyUrl;
     }
 
-    if (account.enabled !== false) {
+    if (account.enabled) {
       this.setAccountEnabled(accountIndex, false);
     } else {
       this.requestSaveToDisk();
@@ -1036,7 +1017,7 @@ export class AccountManager {
     account.verificationRequiredReason = undefined;
     account.verificationUrl = undefined;
 
-    if (enableAccount && wasVerificationRequired && account.enabled === false) {
+    if (enableAccount && wasVerificationRequired && !account.enabled) {
       this.setAccountEnabled(accountIndex, true);
     } else if (wasVerificationRequired || hadMetadata) {
       this.requestSaveToDisk();
@@ -1150,7 +1131,7 @@ export class AccountManager {
   ): number {
     const available = this.accounts.filter((a) => {
       clearExpiredRateLimits(a);
-      return a.enabled !== false && (strict && headerStyle
+      return a.enabled && (strict && headerStyle
         ? !isRateLimitedForHeaderStyle(a, family, headerStyle, model)
         : !isRateLimitedForFamily(a, family, model));
     });
@@ -1190,11 +1171,11 @@ export class AccountManager {
     return [...this.accounts];
   }
 
-  async saveToDisk(): Promise<void> {
-    const claudeIndex = Math.max(0, this.currentAccountIndexByFamily.claude);
-    const geminiIndex = Math.max(0, this.currentAccountIndexByFamily.gemini);
-    
-    const storage: AccountStorageV4 = {
+  private buildStorageObject(): AccountStorageV4 {
+    const claudeIndex = Math.max(0, this.currentAccountIndexByFamily.claude)
+    const geminiIndex = Math.max(0, this.currentAccountIndexByFamily.gemini)
+
+    return {
       version: 4,
       accounts: this.accounts.map((a) => ({
         email: a.email,
@@ -1219,9 +1200,12 @@ export class AccountManager {
         claude: claudeIndex,
         gemini: geminiIndex,
       },
-    };
+    }
+  }
 
-    await saveAccounts(storage);
+  async saveToDisk(): Promise<void> {
+    const data = this.buildStorageObject()
+    await saveAccounts(data)
   }
 
   /**
@@ -1230,38 +1214,8 @@ export class AccountManager {
    * by the merge logic in saveAccounts.
    */
   async saveToDiskReplace(): Promise<void> {
-    const claudeIndex = Math.max(0, this.currentAccountIndexByFamily.claude);
-    const geminiIndex = Math.max(0, this.currentAccountIndexByFamily.gemini);
-
-    const storage: AccountStorageV4 = {
-      version: 4,
-      accounts: this.accounts.map((a) => ({
-        email: a.email,
-        refreshToken: a.parts.refreshToken,
-        projectId: a.parts.projectId,
-        managedProjectId: a.parts.managedProjectId,
-        addedAt: a.addedAt,
-        lastUsed: a.lastUsed,
-        enabled: a.enabled,
-        rateLimitResetTimes: Object.keys(a.rateLimitResetTimes).length > 0 ? a.rateLimitResetTimes : undefined,
-        fingerprint: a.fingerprint,
-        fingerprintHistory: a.fingerprintHistory?.length ? a.fingerprintHistory : undefined,
-        cachedQuota: a.cachedQuota && Object.keys(a.cachedQuota).length > 0 ? a.cachedQuota : undefined,
-        cachedQuotaUpdatedAt: a.cachedQuotaUpdatedAt,
-        dailyRequestCounts: a.dailyRequestCounts,
-        verificationRequired: a.verificationRequired,
-        verificationRequiredAt: a.verificationRequiredAt,
-        verificationRequiredReason: a.verificationRequiredReason,
-        verificationUrl: a.verificationUrl,
-      })),
-      activeIndex: claudeIndex,
-      activeIndexByFamily: {
-        claude: claudeIndex,
-        gemini: geminiIndex,
-      },
-    };
-
-    await saveAccountsReplace(storage);
+    const data = this.buildStorageObject()
+    await saveAccountsReplace(data)
   }
 
 
@@ -1426,7 +1380,7 @@ export class AccountManager {
     const now = nowMs();
     const indices: number[] = [];
     for (const account of this.accounts) {
-      if (account.enabled === false) continue;
+      if (!account.enabled) continue;
       const hasRateLimits = Object.keys(account.rateLimitResetTimes).length > 0;
       const isStale = account.cachedQuotaUpdatedAt == null || (now - account.cachedQuotaUpdatedAt) > maxAgMs;
       if (hasRateLimits || isStale) {
@@ -1575,7 +1529,7 @@ export class AccountManager {
   getOldestQuotaCacheAge(): number | null {
     let oldest: number | null = null;
     for (const acc of this.accounts) {
-      if (acc.enabled === false) continue;
+      if (!acc.enabled) continue;
       if (acc.cachedQuotaUpdatedAt == null) return null;
       const age = nowMs() - acc.cachedQuotaUpdatedAt;
       if (oldest === null || age > oldest) oldest = age;
@@ -1585,7 +1539,7 @@ export class AccountManager {
 
   areAllAccountsOverSoftQuota(family: ModelFamily, thresholdPercent: number, cacheTtlMs: number, model?: string | null): boolean {
     if (thresholdPercent >= 100) return false;
-    const enabled = this.accounts.filter(a => a.enabled !== false);
+    const enabled = this.accounts.filter(a => a.enabled);
     if (enabled.length === 0) return false;
     return enabled.every(a => isOverSoftQuotaThreshold(a, family, thresholdPercent, cacheTtlMs, model));
   }
@@ -1604,7 +1558,7 @@ export class AccountManager {
   ): number | null {
     if (thresholdPercent >= 100) return 0;
     
-    const enabled = this.accounts.filter(a => a.enabled !== false);
+    const enabled = this.accounts.filter(a => a.enabled);
     if (enabled.length === 0) return null;
     
     // If any account is available (not over threshold), no wait needed

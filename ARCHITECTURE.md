@@ -20,7 +20,7 @@
 **Entry Point / Orchestrator:**
 - Purpose: Intercepts fetch calls, manages auth lifecycle, routes requests, handles rate-limit retry loops
 - Location: `src/plugin.ts`
-- Contains: `createAntigravityPlugin` factory, rate-limit state machines, toast debounce, OAuth login flows, verification probe, account persistence helpers, per-message request counter, capacity retries limited to 1 per endpoint before fingerprint regeneration
+- Contains: `createAntigravityPlugin` factory, rate-limit state machines, toast debounce, OAuth login flows, verification probe, account persistence helpers, per-message request counter, capacity retries limited to 1 per endpoint before fingerprint regeneration, raw TLS transport integration via `fetchWithRawTransport`
 - Depends on: Every other layer
 - Used by: OpenCode host via `@opencode-ai/plugin` contract
 
@@ -86,14 +86,21 @@
 **Streaming Core:**
 - Purpose: Transform SSE stream payloads line-by-line; cache signatures; inject debug annotations
 - Location: `src/plugin/core/streaming/` (`transformer.ts`, `types.ts`, `index.ts`)
-- Contains: `createStreamingTransformer`, `transformSseLine`, `transformStreamingPayload`, and `onUsageMetadata` callback to extract usage stats and log cache hit-rate at stream completion
+- Contains: `createStreamingTransformer`, `transformSseLine`, `transformStreamingPayload`, and `onUsageMetadata` callback to extract usage stats and log cache hit-rate at stream completion; emits a final SSE step-finish frame with `finishReason: "STOP"` at stream termination
 - Depends on: `src/plugin/stores/signature-store.ts`
 - Used by: `src/plugin/request.ts`
+
+**Raw TLS Transport:**
+- Purpose: Drop-in replacement for `fetch()` using raw TLS sockets for byte-level control over HTTP/1.1 serialization, header ordering, and response parsing; supports HTTPS CONNECT proxies via `HTTPS_PROXY` and `NO_PROXY` env vars
+- Location: `src/plugin/transport.ts`
+- Contains: `fetchWithRawTransport`, `TransportOptions`, `DEFAULT_RESPONSE_HEADER_TIMEOUT_MS`, `DEFAULT_IDLE_TIMEOUT_MS`, `ContentLengthStream`, `ChunkedDecodeStream`, connection helpers (`connectDirect`, `connectViaProxy`, `connectTlsWithAbort`)
+- Depends on: `node:net`, `node:tls`, `node:stream`, `node:zlib`
+- Used by: `src/plugin.ts` (main request path, cache warmup probes, thinking warmup), `src/plugin/search.ts` (Google Search grounding)
 
 **Configuration:**
 - Purpose: Load, merge, and validate plugin configuration from files and environment variables
 - Location: `src/plugin/config/` (`schema.ts`, `loader.ts`, `models.ts`, `updater.ts`, `index.ts`)
-- Contains: `AntigravityConfigSchema`, `loadConfig`, `initRuntimeConfig`, `AntigravityConfig`, settings for `thinking_warmup`, `max_account_switches`, `quota_style_fallback`
+- Contains: `AntigravityConfigSchema`, `loadConfig`, `initRuntimeConfig`, `AntigravityConfig`, settings for `thinking_warmup`, `max_account_switches`, `quota_style_fallback`, `use_raw_transport`
 - Depends on: `zod`
 - Used by: `src/plugin.ts`, most `src/plugin/` modules via `getKeepThinking()` etc.
 
@@ -143,8 +150,8 @@
 4. `resolveModelWithTier()` maps model name → Antigravity model ID + header style — `src/plugin/transform/model-resolver.ts`
 5. `prepareAntigravityRequest()` cleans schema, strips thinking blocks for Claude, normalizes empty/whitespace parts to `{ text: "." }` sentinels to prevent prompt cache invalidation on Magic Context execute passes, injects tool-hardening, and appends Claude thinking hints in a strict stable ordering (original prompt → tool hardening → thinking hint) to maximize prompt cache hits — `src/plugin/request.ts`, `src/plugin/request-helpers.ts`
 6. `buildFingerprintHeaders()` attaches per-account device fingerprint — `src/plugin/fingerprint.ts`
-7. If an account switch occurred and `cache_warmup_on_switch` is enabled, a lightweight cache warmup probe is sent using the exact request body but aborting after the first SSE chunk to warm the gateway-side cache — `src/plugin.ts`
-8. `fetch()` is called against Antigravity endpoint with Bearer token — `src/plugin.ts`
+7. If an account switch occurred and `cache_warmup_on_switch` is enabled, a lightweight cache warmup probe is sent using the exact request body but aborting after the first SSE chunk to warm the gateway-side cache (uses raw TLS transport when enabled) — `src/plugin.ts`
+8. If `use_raw_transport` is enabled (default) and header style is `antigravity`, `fetchWithRawTransport()` performs a raw TLS socket request; otherwise `fetch()` is used — `src/plugin.ts`, `src/plugin/transport.ts`
 9. `accountManager.recordRequest()` tracks daily request usage per account and updates in-memory session request counts for rate consumption estimation — `src/plugin.ts`, `src/plugin/accounts.ts`
 10. If the active account's remaining quota drops below `proactive_rotation_threshold_percent` (default 20%), a proactive rotation switches the account to a session-warm or high-quota account for the next request — `src/plugin.ts`, `src/plugin/accounts.ts`
 11. `transformAntigravityResponse()` converts SSE stream back to Gemini API format — `src/plugin/request.ts`
@@ -252,4 +259,4 @@
 
 **Storage:** Accounts persisted to `antigravity-accounts.json` (XDG data dir) via `src/plugin/storage.ts` with `proper-lockfile` for concurrent-write safety. Current format is version 4, featuring automatic migration from older versions (v1, v2, v3), secure POSIX permissions (0600), and legacy Windows path migration. Persists per-account daily request counters (`dailyRequestCounts`) and per-model granular quota data (`cachedPerModelQuota`). Config loaded from `.opencode/antigravity.json` (project) and `~/.config/opencode/antigravity.json` (user).
 
-**Configuration:** Two-level config file hierarchy (project overrides user) plus environment variable overrides. All config is read once at startup via `loadConfig()` and made available globally via `initRuntimeConfig()` and module-level getters. Config supports quota fallback disabling via `quota_style_fallback: false`, switches limit via `max_account_switches: 2`, thinking warmup option `thinking_warmup: false`, cache warmup on account switch via `cache_warmup_on_switch: true`, and proactive rotation threshold via `proactive_rotation_threshold_percent: 20`.
+**Configuration:** Two-level config file hierarchy (project overrides user) plus environment variable overrides. All config is read once at startup via `loadConfig()` and made available globally via `initRuntimeConfig()` and module-level getters. Config supports quota fallback disabling via `quota_style_fallback: false`, switches limit via `max_account_switches: 2`, thinking warmup option `thinking_warmup: false`, cache warmup on account switch via `cache_warmup_on_switch: true`, proactive rotation threshold via `proactive_rotation_threshold_percent: 20`, and raw TLS transport via `use_raw_transport: true` (default).

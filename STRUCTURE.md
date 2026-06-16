@@ -38,6 +38,7 @@ opencode-antigravity-auth/
 │       ├── storage.ts            # Zod schemas for antigravity-accounts.json, file I/O, and daily request counters
 │       ├── thinking-recovery.ts  # Turn-boundary detection, thinking block repair
 │       ├── token.ts              # refreshAccessToken, AntigravityTokenRefreshError
+│       ├── transport.ts          # Raw TLS socket transport (fetchWithRawTransport) replacing Node.js fetch() for byte-level HTTP/1.1 control and proxy support
 │       ├── types.ts              # Shared plugin interfaces (PluginResult, AuthDetails, …)
 │       ├── version.ts            # Runtime Antigravity version fetch + setter
 │       ├── cache/                # Signature cache subsystem
@@ -128,8 +129,8 @@ opencode-antigravity-auth/
 - Key files: `src/hooks/auto-update-checker/index.ts` (public API), `src/hooks/auto-update-checker/checker.ts` (npm fetch + version compare)
 
 **`src/plugin/`:**
-- Purpose: All core plugin subsystems — auth, request transform, account management, recovery, config, logging
-- Contains: ~35 TypeScript modules + 7 subdirectories
+- Purpose: All core plugin subsystems — auth, request transform, account management, recovery, raw transport, config, logging
+- Contains: 28 source modules + 7 subdirectories
 - Key files: `src/plugin/accounts.ts`, `src/plugin/request.ts`, `src/plugin/storage.ts`, `src/plugin/types.ts`
 
 **`src/plugin/transform/`:**
@@ -186,6 +187,7 @@ opencode-antigravity-auth/
 **Model Resolution:** `src/plugin/transform/model-resolver.ts` — `resolveModelWithTier`, `MODEL_ALIASES`
 **Types:** `src/plugin/types.ts` — `PluginResult`, `AuthDetails`, `PluginContext`, `OAuthAuthDetails`
 **Tests:** `src/plugin/*.test.ts`, `src/plugin/transform/*.test.ts`, `src/hooks/**/*.test.ts` — co-located with source
+**Raw Transport:** `src/plugin/transport.ts` — `fetchWithRawTransport`, `ContentLengthStream`, `ChunkedDecodeStream`; byte-level HTTP/1.1 with HTTPS CONNECT proxy support
 
 ---
 
