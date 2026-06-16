@@ -217,6 +217,7 @@ async function triggerAsyncQuotaRefreshForAccount(
 
 let fleetRefreshInProgress = false;
 let lastFleetRefreshTime = 0;
+let fleetQuotaRefreshedThisSession = false;
 
 async function triggerFleetQuotaRefresh(
   accountManager: AccountManager,
@@ -2655,12 +2656,15 @@ if (toastScope === "root_only" && getIsChildSession()) {
                     config.quota_refresh_interval_minutes,
                   );
 
-                  void triggerFleetQuotaRefresh(
-                    accountManager,
-                    client,
-                    providerId,
-                    config.quota_refresh_interval_minutes,
-                  );
+                  if (!fleetQuotaRefreshedThisSession) {
+                    fleetQuotaRefreshedThisSession = true;
+                    void triggerFleetQuotaRefresh(
+                      accountManager,
+                      client,
+                      providerId,
+                      config.quota_refresh_interval_minutes,
+                    );
+                  }
 
                   // Proactive rotation: if current account quota is low, pre-switch
                   // to a warm-cache account so the NEXT request avoids a cold cache miss

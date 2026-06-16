@@ -147,10 +147,15 @@ export const AntigravityConfigSchema = z.object({
    * Costs ~1 quota unit per account switch but eliminates the 0% cold-cache
    * MISS that otherwise occurs on every rotation.
    *
+   * **Note:** Each probe costs ~1 quota unit. When forced rotations are
+   * frequent (e.g., 429 cycling across many accounts), this adds up.
+   * Disabled by default to conserve quota; enable when cache hit rate
+   * matters more than quota conservation.
+   *
    * Env override: OPENCODE_ANTIGRAVITY_CACHE_WARMUP_ON_SWITCH=1
-   * @default true
+   * @default false
    */
-  cache_warmup_on_switch: z.boolean().default(true),
+  cache_warmup_on_switch: z.boolean().default(false),
   
   // =========================================================================
   // Session Recovery
@@ -564,7 +569,7 @@ export const DEFAULT_CONFIG: AntigravityConfig = {
   debug_tui: false,
   keep_thinking: false,
   thinking_warmup: false,
-  cache_warmup_on_switch: true,
+  cache_warmup_on_switch: false,
   session_recovery: true,  auto_resume: true,
   resume_text: "continue",
   empty_response_max_attempts: 2,
