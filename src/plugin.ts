@@ -1524,7 +1524,6 @@ export const createAntigravityPlugin = (providerId: string) => async (
         {
           query: args.query,
           urls: args.urls,
-          thinking: args.thinking,
         },
         accessToken,
         projectId,
@@ -2669,9 +2668,12 @@ if (toastScope === "root_only" && getIsChildSession()) {
                   }
 
                   // Proactive rotation: if current account quota is low, pre-switch
-                  // to a warm-cache account so the NEXT request avoids a cold cache miss
+                  // to a warm-cache account so the NEXT request avoids a cold cache miss.
+                  // Skip for main session in sticky mode — switching accounts busts the
+                  // server-side prefix cache, defeating the whole point of sticky selection.
                   const proactiveThreshold = config.proactive_rotation_threshold_percent ?? 20;
-                  if (proactiveThreshold > 0 && accountManager.shouldProactivelyRotate(
+                  const isMainSessionSticky = !effectiveChildSessionId && config.account_selection_strategy === 'sticky';
+                  if (proactiveThreshold > 0 && !isMainSessionSticky && accountManager.shouldProactivelyRotate(
                     family,
                     model,
                     proactiveThreshold,

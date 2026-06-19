@@ -88,7 +88,6 @@ interface AntigravitySearchResponse {
 export interface SearchArgs {
   query: string;
   urls?: string[];
-  thinking?: boolean;
 }
 
 export interface SearchResult {

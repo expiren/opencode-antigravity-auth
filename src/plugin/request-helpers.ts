@@ -1223,7 +1223,6 @@ function filterContentArray(
           } else {
             (restoredPart as any).signature = cachedSignature;
           }
-          const sanitized = sanitizeThinkingPart(restoredPart as Record<string, unknown>);
           pushSanitizedOrSentinel(filtered, restoredPart as Record<string, unknown>, item as Record<string, unknown>)
           continue;
         }
