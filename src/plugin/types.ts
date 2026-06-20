@@ -97,6 +97,7 @@ export interface PluginResult {
   };
   event?: (payload: PluginEventPayload) => void;
   tool?: Record<string, unknown>;
+  config?: (config: Record<string, unknown>) => Promise<void>;
 }
 
 export interface RefreshParts {

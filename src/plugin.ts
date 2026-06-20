@@ -59,6 +59,7 @@ import { initHealthTracker, getHealthTracker, initTokenTracker, getTokenTracker 
 import { getAntigravityVersionResolution, initAntigravityVersion } from "./plugin/version";
 import { executeSearch, initSearchSessionId } from "./plugin/search";
 import { fetchWithRawTransport } from "./plugin/transport";
+import { OPENCODE_MODEL_DEFINITIONS } from "./plugin/model-registry";
 import type {
   GetAuth,
   LoaderResult,
@@ -1533,6 +1534,9 @@ export const createAntigravityPlugin = (providerId: string) => async (
   });
 
   return {
+    config: async (opencodeConfig: Record<string, unknown>) => {
+      applyAntigravityProviderCatalog(opencodeConfig, providerId, config);
+    },
     event: eventHandler,
     tool: {
       google_search: googleSearchTool,
@@ -3923,6 +3927,39 @@ function isExplicitQuotaFromUrl(urlString: string): boolean {
   }
   const { explicitQuota } = resolveModelWithTier(modelWithSuffix);
   return explicitQuota ?? false;
+}
+
+type OpencodeMutableConfig = Record<string, unknown> & {
+  provider?: Record<string, Record<string, unknown> & {
+    models?: Record<string, unknown>;
+    whitelist?: string[];
+  }>;
+};
+
+function applyAntigravityProviderCatalog(
+  opencodeConfig: Record<string, unknown>,
+  providerId: string,
+  pluginConfig: AntigravityConfig
+): void {
+  const mutableConfig = opencodeConfig as OpencodeMutableConfig;
+  mutableConfig.provider ??= {};
+
+  const providerConfig = mutableConfig.provider[providerId] ?? {};
+  
+  // Merge order (lowest to highest priority):
+  // 1. Built-in defaults: OPENCODE_MODEL_DEFINITIONS
+  // 2. Decoupled models (from antigravity.json / antigravity-models.json): pluginConfig.models
+  // 3. User's main opencode.json models (preserves backwards compatibility / custom overrides)
+  providerConfig.models = {
+    ...OPENCODE_MODEL_DEFINITIONS,
+    ...(pluginConfig.models ?? {}),
+    ...(providerConfig.models ?? {}),
+  };
+  
+  // Whitelist should be the union of all registered models so they aren't pruned by OpenCode
+  providerConfig.whitelist = Object.keys(providerConfig.models);
+  
+  mutableConfig.provider[providerId] = providerConfig;
 }
 
 export const __testExports = {
